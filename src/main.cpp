@@ -1,15 +1,39 @@
 #include <igl/opengl/glfw/Viewer.h>
+#include <igl/opengl/glfw/imgui/ImGuiHelpers.h>
+#include <igl/opengl/glfw/imgui/ImGuiMenu.h>
 #include <igl/readOFF.h>
+#include <imgui/imgui.h>
 
 #ifndef ASSET_PATH
 #define ASSET_PATH "data"
 #endif
 
-// Plot the mesh
-igl::opengl::glfw::Viewer viewer;
-
 Eigen::MatrixXd V;
 Eigen::MatrixXi F;
+
+class CustomMenu : public igl::opengl::glfw::imgui::ImGuiMenu
+{
+  public:
+	CustomMenu()
+	{
+	}
+
+	virtual void draw_viewer_menu() override
+	{
+		// Draw parent menu
+		ImGuiMenu::draw_viewer_menu();
+
+		// Add new group
+		if (ImGui::CollapsingHeader("Search Options", ImGuiTreeNodeFlags_DefaultOpen))
+		{
+		}
+	}
+} menu;
+
+bool key_down(igl::opengl::glfw::Viewer &viewer, unsigned char key, int modifier)
+{
+	return false;
+}
 
 int main(int argc, char *argv[])
 {
@@ -19,6 +43,9 @@ int main(int argc, char *argv[])
 	igl::opengl::glfw::Viewer viewer;
 
 	viewer.data().set_mesh(V, F);
+
+	viewer.callback_key_down = &key_down;
+	viewer.plugins.push_back(&menu);
 	viewer.launch();
 	return EXIT_SUCCESS;
 }
