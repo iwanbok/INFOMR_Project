@@ -1,3 +1,25 @@
+#include <igl/opengl/glfw/Viewer.h>
+#include <igl/readOFF.h>
+
+#ifndef ASSET_PATH
+#define ASSET_PATH "data"
+#endif
+
+Eigen::MatrixXd V;
+Eigen::MatrixXi F;
+
+int main(int argc, char *argv[])
+{
+	// Load a mesh in OFF format
+	igl::readOFF(ASSET_PATH "/bunny.off", V, F);
+
+	// Plot the mesh
+	igl::opengl::glfw::Viewer viewer;
+	viewer.data().set_mesh(V, F);
+	viewer.launch();
+}
+
+#if 0
 #include "scene.h"
 #include <igl/opengl/glfw/Viewer.h>
 #include <igl/opengl/glfw/imgui/ImGuiHelpers.h>
@@ -239,3 +261,4 @@ int main(int argc, char *argv[])
 
 	mgpViewer.launch();
 }
+#endif
