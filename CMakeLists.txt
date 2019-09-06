@@ -1,7 +1,10 @@
 cmake_minimum_required(VERSION 3.1)
 project(MR)
 
-set (CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
@@ -20,3 +23,9 @@ add_compile_definitions(ASSET_PATH="${CMAKE_CURRENT_SOURCE_DIR}/data/")
 add_executable(${PROJECT_NAME}_bin ${SRCFILES})
 target_link_libraries(${PROJECT_NAME}_bin       PRIVATE igl::core igl::opengl_glfw igl::opengl_glfw_imgui)
 target_include_directories(${PROJECT_NAME}_bin  PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+if(MSVC)
+# enable updated __cplusplus macro value
+if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 19.14)
+    target_compile_options(${PROJECT_NAME}_bin PRIVATE "/Zc:__cplusplus") # available since VS 2017 15.7
+endif()
+endif()
