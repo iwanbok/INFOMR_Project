@@ -131,6 +131,9 @@ vector<string> split(string strToSplit, char delimeter)
 
 void preProcessMeshDatabase(const vector<string> &files)
 {
+	float avgV = 0, avgF = 0;
+	int minV = INT_MAX, maxV = 0, minF = INT_MAX, maxF = 0;
+	vector<string> toobig;
 	for (auto &f : files)
 		if (endsWith(f, ".off") || endsWith(f, ".ply"))
 		{
@@ -142,13 +145,30 @@ void preProcessMeshDatabase(const vector<string> &files)
 			infoFile << "mesh\t\t" << f << endl;
 			infoFile << "class\t\t" << splitted[max((int)splitted.size() - 2, 0)] << endl;
 			infoFile << "vertices\t" << V.rows() << endl;
+			avgV += V.rows();
+			minV = min(minV, (int)V.rows());
+			maxV = max(maxV, (int)V.rows());
+			if(V.rows() > 10000)
+				toobig.push_back(f);
 			infoFile << "faces\t\t" << F.rows() << endl;
+			avgF += F.rows();
+			minF = min(minF, (int)F.rows());
+			maxF = max(maxF, (int)F.rows());
 			infoFile << "facetype\t"
 					 << "triangle" << endl; // TODO
 			infoFile << "mincorner\t" << V.colwise().minCoeff() << endl;
 			infoFile << "maxcorner\t" << V.colwise().maxCoeff() << endl;
 			infoFile.close();
 		}
+
+	avgV /= files.size();
+	avgF /= files.size();
+	printf("# of Vertices:\n\tAvg: %.2f\n\tMin: %i\n\tMax:%i\n# of Faces:\n\tAvg: %.2f\n\tMin: "
+		   "%i\n\tMax: %i\n",
+		   avgV, minV, maxV, avgF, minF, maxF);
+	printf("The following meshes have too many vertices:\n");
+	for (auto &f : toobig)
+		cout << f.substr(f.size()-20, 20) << endl;
 }
 
 int main(int argc, char *argv[])
