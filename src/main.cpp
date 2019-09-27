@@ -132,10 +132,12 @@ vector<string> split(string strToSplit, char delimeter)
 void preProcessMeshDatabase(const vector<string> &files)
 {
 	float avgV = 0, avgF = 0;
-	int minV = INT_MAX, maxV = 0, minF = INT_MAX, maxF = 0;
-	vector<string> toobig;
+	int minV = INT_MAX, maxV = 0, minF = INT_MAX, maxF = 0, numMeshes = 0;
+	vector<string> toobig, toosmall;
 	for (auto &f : files)
-		if (endsWith(f, ".off") || endsWith(f, ".ply"))
+		if ((endsWith(f, ".off") || endsWith(f, ".ply")) &&
+			find(files.begin(), files.end(), f.substr(0, f.size() - 4) + "_cleaned.off") ==
+				files.end())
 		{
 			auto splitted = split(f, '\\');
 			igl::read_triangle_mesh(f, V, F);
@@ -148,8 +150,10 @@ void preProcessMeshDatabase(const vector<string> &files)
 			avgV += V.rows();
 			minV = min(minV, (int)V.rows());
 			maxV = max(maxV, (int)V.rows());
-			if(V.rows() > 10000)
+			if (F.rows() > 30000)
 				toobig.push_back(f);
+			else if (F.rows() < 10000)
+				toosmall.push_back(f);
 			infoFile << "faces\t\t" << F.rows() << endl;
 			avgF += F.rows();
 			minF = min(minF, (int)F.rows());
@@ -159,16 +163,19 @@ void preProcessMeshDatabase(const vector<string> &files)
 			infoFile << "mincorner\t" << V.colwise().minCoeff() << endl;
 			infoFile << "maxcorner\t" << V.colwise().maxCoeff() << endl;
 			infoFile.close();
+			numMeshes++;
 		}
 
-	avgV /= files.size();
-	avgF /= files.size();
+	avgV /= numMeshes;
+	avgF /= numMeshes;
 	printf("# of Vertices:\n\tAvg: %.2f\n\tMin: %i\n\tMax:%i\n# of Faces:\n\tAvg: %.2f\n\tMin: "
 		   "%i\n\tMax: %i\n",
 		   avgV, minV, maxV, avgF, minF, maxF);
-	printf("The following meshes have too many vertices:\n");
+	ofstream toobigFile(ASSET_PATH "toobig.txt"), toosmallFile(ASSET_PATH "toosmall.txt");
 	for (auto &f : toobig)
-		cout << f.substr(f.size()-20, 20) << endl;
+		toobigFile << f << endl;
+	for (auto &f : toosmall)
+		toosmallFile << f << endl;
 }
 
 int main(int argc, char *argv[])
@@ -177,7 +184,7 @@ int main(int argc, char *argv[])
 	preProcessMeshDatabase(files);
 
 	// Load a mesh in OFF format
-	igl::readOFF(ASSET_PATH "/bunny.off", V, F);
+	igl::readOFF(ASSET_PATH "LabeledDB_new/Human/1_cleaned.off", V, F);
 
 	igl::opengl::glfw::Viewer viewer;
 

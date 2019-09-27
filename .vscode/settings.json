@@ -1,0 +1,6 @@
+{
+    "files.associations": {
+        "*.ag": "haskell",
+        "iosfwd": "cpp"
+    }
+}
