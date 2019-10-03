@@ -1,6 +1,7 @@
 {
     "files.associations": {
         "*.ag": "haskell",
-        "iosfwd": "cpp"
+        "iosfwd": "cpp",
+        "fstream": "cpp"
     }
 }
