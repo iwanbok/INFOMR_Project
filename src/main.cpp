@@ -160,8 +160,17 @@ void preProcessMeshDatabase(const vector<string> &files)
 			maxF = max(maxF, (int)F.rows());
 			infoFile << "facetype\t"
 					 << "triangle" << endl; // TODO
-			infoFile << "mincorner\t" << V.colwise().minCoeff() << endl;
-			infoFile << "maxcorner\t" << V.colwise().maxCoeff() << endl;
+			auto minCorner = V.colwise().minCoeff();
+			auto maxCorner = V.colwise().maxCoeff();
+			auto baryCenter = V.colwise().sum() / V.rows();
+			auto scaleFactor = 0.5 / max((baryCenter - minCorner).maxCoeff(), (maxCorner - baryCenter).maxCoeff());
+			infoFile << "mincorner\t" << minCorner << endl;
+			infoFile << "maxcorner\t" << maxCorner << endl;
+			infoFile << "barycenter\t" << baryCenter << endl;
+			infoFile << "scaleFactor\t" << scaleFactor << endl;
+			auto normalized = scaleFactor * (V.rowwise() - baryCenter);
+			// TODO WRITE to file
+
 			infoFile.close();
 			numMeshes++;
 		}
