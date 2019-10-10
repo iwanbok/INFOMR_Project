@@ -3,7 +3,7 @@
 // ----------------------------------------------------------------------------
 // The MIT License (MIT)
 //
-// Copyright (c) 2018 www.open3d.org
+// Copyright (c) 2019 www.open3d.org
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -26,42 +26,22 @@
 
 #pragma once
 
+#include <Eigen/Core>
+#include <memory>
+#include <vector>
+
 namespace open3d {
 namespace geometry {
 
-class Geometry {
+class TriangleMesh;
+
+class Qhull {
 public:
-    enum class GeometryType {
-        Unspecified = 0,
-        PointCloud = 1,
-        VoxelGrid = 2,
-        Octree = 3,
-        LineSet = 4,
-        TriangleMesh = 5,
-        HalfEdgeTriangleMesh = 6,
-        Image = 7,
-        RGBDImage = 8,
-        TetraMesh = 9,
-        OrientedBoundingBox = 10,
-        AxisAlignedBoundingBox = 11,
-    };
+    static std::shared_ptr<TriangleMesh> ComputeConvexHull(
+            const std::vector<Eigen::Vector3d>& points);
 
-public:
-    virtual ~Geometry() {}
-
-protected:
-    Geometry(GeometryType type, int dimension)
-        : geometry_type_(type), dimension_(dimension) {}
-
-public:
-    virtual Geometry& Clear() = 0;
-    virtual bool IsEmpty() const = 0;
-    GeometryType GetGeometryType() const { return geometry_type_; }
-    int Dimension() const { return dimension_; }
-
-private:
-    GeometryType geometry_type_ = GeometryType::Unspecified;
-    int dimension_ = 3;
+//     static std::shared_ptr<TetraMesh> ComputeDelaunayTetrahedralization(
+//             const std::vector<Eigen::Vector3d>& points);
 };
 
 }  // namespace geometry

@@ -5,12 +5,15 @@
 #include <imgui/imgui.h>
 
 #include <algorithm>
-#include <experimental/filesystem>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <sstream>
 #include <string>
 #include <vector>
+
+#include "Open3D/Geometry/TriangleMesh.h"
+#include "Open3D/IO/TriangleMeshIO.h"
 
 #ifndef ASSET_PATH
 #define ASSET_PATH "data"
@@ -18,7 +21,7 @@
 
 using namespace Eigen;
 using namespace std;
-namespace filesys = std::experimental::filesystem;
+namespace filesys = std::filesystem;
 
 MatrixXd V;
 MatrixXi F;
@@ -193,7 +196,7 @@ int main(int argc, char *argv[])
 	preProcessMeshDatabase(files);
 
 	// Load a mesh in OFF format
-	igl::readOFF(ASSET_PATH "LabeledDB_new/Human/1_cleaned.off", V, F);
+	igl::readOFF(ASSET_PATH "bunny.off", V, F);
 
 	igl::opengl::glfw::Viewer viewer;
 

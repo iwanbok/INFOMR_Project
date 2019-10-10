@@ -26,43 +26,46 @@
 
 #pragma once
 
+#include <string>
+#include <vector>
+
 namespace open3d {
-namespace geometry {
+namespace utility {
+namespace filesystem {
 
-class Geometry {
-public:
-    enum class GeometryType {
-        Unspecified = 0,
-        PointCloud = 1,
-        VoxelGrid = 2,
-        Octree = 3,
-        LineSet = 4,
-        TriangleMesh = 5,
-        HalfEdgeTriangleMesh = 6,
-        Image = 7,
-        RGBDImage = 8,
-        TetraMesh = 9,
-        OrientedBoundingBox = 10,
-        AxisAlignedBoundingBox = 11,
-    };
+std::string GetFileExtensionInLowerCase(const std::string &filename);
 
-public:
-    virtual ~Geometry() {}
+std::string GetFileNameWithoutExtension(const std::string &filename);
 
-protected:
-    Geometry(GeometryType type, int dimension)
-        : geometry_type_(type), dimension_(dimension) {}
+std::string GetFileNameWithoutDirectory(const std::string &filename);
 
-public:
-    virtual Geometry& Clear() = 0;
-    virtual bool IsEmpty() const = 0;
-    GeometryType GetGeometryType() const { return geometry_type_; }
-    int Dimension() const { return dimension_; }
+std::string GetFileParentDirectory(const std::string &filename);
 
-private:
-    GeometryType geometry_type_ = GeometryType::Unspecified;
-    int dimension_ = 3;
-};
+std::string GetRegularizedDirectoryName(const std::string &directory);
 
-}  // namespace geometry
+std::string GetWorkingDirectory();
+
+bool ChangeWorkingDirectory(const std::string &directory);
+
+bool DirectoryExists(const std::string &directory);
+
+bool MakeDirectory(const std::string &directory);
+
+bool MakeDirectoryHierarchy(const std::string &directory);
+
+bool DeleteDirectory(const std::string &directory);
+
+bool FileExists(const std::string &filename);
+
+bool RemoveFile(const std::string &filename);
+
+bool ListFilesInDirectory(const std::string &directory,
+                          std::vector<std::string> &filenames);
+
+bool ListFilesInDirectoryWithExtension(const std::string &directory,
+                                       const std::string &extname,
+                                       std::vector<std::string> &filenames);
+
+}  // namespace filesystem
+}  // namespace utility
 }  // namespace open3d

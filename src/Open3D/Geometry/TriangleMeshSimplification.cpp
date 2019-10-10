@@ -89,10 +89,11 @@ public:
 
 std::shared_ptr<TriangleMesh> TriangleMesh::SimplifyVertexClustering(
         double voxel_size,
-        SimplificationContraction
+        TriangleMesh::SimplificationContraction
                 contraction /* = SimplificationContraction::Average */) const {
     auto mesh = std::make_shared<TriangleMesh>();
     if (voxel_size <= 0.0) {
+        printf("[VoxelGridFromPointCloud] voxel_size <= 0.\n");
         return mesh;
     }
 
@@ -102,6 +103,8 @@ std::shared_ptr<TriangleMesh> TriangleMesh::SimplifyVertexClustering(
     Eigen::Vector3d voxel_max_bound = GetMaxBound() + voxel_size3 * 0.5;
     if (voxel_size * std::numeric_limits<int>::max() <
         (voxel_max_bound - voxel_min_bound).maxCoeff()) {
+        printf(
+                "[VoxelGridFromPointCloud] voxel_size is too small.\n");
         return mesh;
     }
 
@@ -165,7 +168,7 @@ std::shared_ptr<TriangleMesh> TriangleMesh::SimplifyVertexClustering(
         return aggr;
     };
 
-    if (contraction == SimplificationContraction::Average) {
+    if (contraction == TriangleMesh::SimplificationContraction::Average) {
         for (const auto& voxel : voxel_vertices) {
             int vox_vidx = voxel_vert_ind[voxel.first];
             mesh->vertices_[vox_vidx] = AvgVertex(voxel.second);
@@ -176,7 +179,8 @@ std::shared_ptr<TriangleMesh> TriangleMesh::SimplifyVertexClustering(
                 mesh->vertex_colors_[vox_vidx] = AvgColor(voxel.second);
             }
         }
-    } else if (contraction == SimplificationContraction::Quadric) {
+    } else if (contraction ==
+               TriangleMesh::SimplificationContraction::Quadric) {
         // Map triangles
         std::unordered_map<int, std::unordered_set<int>> vert_to_triangles;
         for (size_t tidx = 0; tidx < triangles_.size(); ++tidx) {

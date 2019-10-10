@@ -137,6 +137,13 @@ std::shared_ptr<TriangleMesh> TriangleMesh::SubdivideLoop(
             }
         }
 
+        // in manifold meshes this should not happen
+        if (boundary_nbs.size() > 2) {
+            printf(
+                    "[SubdivideLoop] boundary edge with > 2 neighbours, maybe "
+                    "mesh is not manifold.\n");
+        }
+
         double beta, alpha;
         if (boundary_nbs.size() >= 2) {
             beta = 1. / 8.;
@@ -282,6 +289,12 @@ std::shared_ptr<TriangleMesh> TriangleMesh::SubdivideLoop(
         edge_to_triangles[e1].insert(int(tidx));
         Eigen::Vector2i e2 = CreateEdge(tria(2), tria(0));
         edge_to_triangles[e2].insert(int(tidx));
+
+        if (edge_to_triangles[e0].size() > 2 ||
+            edge_to_triangles[e1].size() > 2 ||
+            edge_to_triangles[e2].size() > 2) {
+            printf("[SubdivideLoop] non-manifold edge.\n");
+        }
 
         vertex_neighbours[tria(0)].insert(tria(1));
         vertex_neighbours[tria(0)].insert(tria(2));
