@@ -53,7 +53,7 @@ void preProcessMeshDatabase(const std::vector<std::string> &files)
 	Eigen::MatrixXi F;
 
 	for (auto &f : files)
-		if ((endsWith(f, ".off") || endsWith(f, ".ply")) &&
+		if ((endsWith(f, ".off") || endsWith(f, ".ply")) && !endsWith(f, "_scaled.off") &&
 			find(files.begin(), files.end(), f.substr(0, f.size() - 4) + "_cleaned.off") ==
 				files.end())
 		{
@@ -77,14 +77,14 @@ void preProcessMeshDatabase(const std::vector<std::string> &files)
 			auto baryCenter = V.colwise().sum() / V.rows();
 			auto scaleFactor = 0.5 / std::max((baryCenter - minCorner).maxCoeff(),
 											  (maxCorner - baryCenter).maxCoeff());
-			auto eigenvecsandvals = ComputeEigenVectors(V);
+			auto evecs = ComputeEigenVectors(V);
 			infoFile << "mincorner\t" << minCorner << std::endl;
 			infoFile << "maxcorner\t" << maxCorner << std::endl;
 			infoFile << "barycenter\t" << baryCenter << std::endl;
 			infoFile << "scaleFactor\t" << scaleFactor << std::endl;
-			infoFile << "majoreigenvector" << eigenvecsandvals.col(0).transpose() << std::endl;
-			infoFile << "mediumeigenvector" << eigenvecsandvals.col(1).transpose() << std::endl;
-			infoFile << "minoreigenvector" << eigenvecsandvals.col(2).transpose() << std::endl;
+			infoFile << "majoreigenvector\t" << evecs.col(0).transpose() << std::endl;
+			infoFile << "mediumeigenvector\t" << evecs.col(1).transpose() << std::endl;
+			infoFile << "minoreigenvector\t" << evecs.col(2).transpose() << std::endl;
 
 			infoFile.close();
 
@@ -99,8 +99,14 @@ void preProcessMeshDatabase(const std::vector<std::string> &files)
 			if (F.rows() > 30000 || F.rows() < 10000)
 				outlier.push_back(f);
 
-			auto normalized = scaleFactor * (V.rowwise() - baryCenter);
-			// TODO WRITE to file
+			auto centered = V.rowwise() - baryCenter;
+            std::vector<Eigen::Vector3d> new_v(centered.rows());
+            for(int i = 0; i < centered.rows(); i++)
+                new_v.push_back(centered.row(i) * evecs.transpose());
+            open3d::geometry::TriangleMesh new_mesh(*mesh);
+            new_mesh.vertices_ = new_v;
+                        
+            open3d::io::WriteTriangleMesh(f.substr(0, f.size() - 4) + "_scaled.off", new_mesh, true, true);
 			numMeshes++;
 		}
 

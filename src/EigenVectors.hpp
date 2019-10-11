@@ -34,5 +34,26 @@ Eigen::Matrix3d ComputeEigenVectors(const Eigen::MatrixX3d &points)
 
 	Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> solver;
 	solver.compute(covariance, Eigen::ComputeEigenvectors);
-    return solver.eigenvectors();
+	Eigen::Vector3d evals = solver.eigenvalues();
+	Eigen::Matrix3d evecs = solver.eigenvectors();
+	Eigen::Matrix3d result;
+	if (evals(0) == evals.maxCoeff())
+		result.col(0) = evecs.col(0);
+	else if (evals(0) == evals.minCoeff())
+		result.col(2) = evecs.col(0);
+	else
+		result.col(1) = evecs.col(0);
+	if (evals(1) == evals.maxCoeff())
+		result.col(0) = evecs.col(1);
+	else if (evals(1) == evals.minCoeff())
+		result.col(2) = evecs.col(1);
+	else
+		result.col(1) = evecs.col(1);
+	if (evals(2) == evals.maxCoeff())
+		result.col(0) = evecs.col(2);
+	else if (evals(2) == evals.minCoeff())
+		result.col(2) = evecs.col(2);
+	else
+		result.col(1) = evecs.col(2);
+	return result;
 }
