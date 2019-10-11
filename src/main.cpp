@@ -1,3 +1,7 @@
+#ifndef ASSET_PATH
+#define ASSET_PATH "data"
+#endif
+
 #include <igl/opengl/glfw/Viewer.h>
 #include <igl/opengl/glfw/imgui/ImGuiHelpers.h>
 #include <igl/opengl/glfw/imgui/ImGuiMenu.h>
@@ -6,18 +10,14 @@
 
 #include <algorithm>
 #include <filesystem>
-#include <fstream>
 #include <iostream>
-#include <sstream>
 #include <string>
 #include <vector>
 
 #include "Open3D/Geometry/TriangleMesh.h"
 #include "Open3D/IO/TriangleMeshIO.h"
 
-#ifndef ASSET_PATH
-#define ASSET_PATH "data"
-#endif
+#include "PreProcess.hpp"
 
 using namespace Eigen;
 using namespace std;
@@ -48,13 +48,6 @@ class CustomMenu : public igl::opengl::glfw::imgui::ImGuiMenu
 bool key_down(igl::opengl::glfw::Viewer &viewer, unsigned char key, int modifier)
 {
 	return false;
-}
-
-static bool endsWith(const std::string &str, const std::string &ending)
-{
-	if (str.length() < ending.length())
-		return false;
-	return str.compare(str.length() - ending.length(), ending.length(), ending) == 0;
 }
 
 // Based on
@@ -115,79 +108,6 @@ vector<string> getAllFilesInDir(const string &dirPath, const vector<string> dirS
 		cerr << "Exception :: " << e.what();
 	}
 	return listOfFiles;
-}
-
-/*
-string split implementation by using delimiter as a character.
-*/
-vector<string> split(string strToSplit, char delimeter)
-{
-	stringstream ss(strToSplit);
-	string item;
-	vector<string> splittedStrings;
-	while (getline(ss, item, delimeter))
-	{
-		splittedStrings.push_back(item);
-	}
-	return splittedStrings;
-}
-
-void preProcessMeshDatabase(const vector<string> &files)
-{
-	float avgV = 0, avgF = 0;
-	int minV = INT_MAX, maxV = 0, minF = INT_MAX, maxF = 0, numMeshes = 0;
-	vector<string> toobig, toosmall;
-	for (auto &f : files)
-		if ((endsWith(f, ".off") || endsWith(f, ".ply")) &&
-			find(files.begin(), files.end(), f.substr(0, f.size() - 4) + "_cleaned.off") ==
-				files.end())
-		{
-			auto splitted = split(f, '\\');
-			igl::read_triangle_mesh(f, V, F);
-
-			ofstream infoFile;
-			infoFile.open(f + ".info");
-			infoFile << "mesh\t\t" << f << endl;
-			infoFile << "class\t\t" << splitted[max((int)splitted.size() - 2, 0)] << endl;
-			infoFile << "vertices\t" << V.rows() << endl;
-			avgV += V.rows();
-			minV = min(minV, (int)V.rows());
-			maxV = max(maxV, (int)V.rows());
-			if (F.rows() > 30000)
-				toobig.push_back(f);
-			else if (F.rows() < 10000)
-				toosmall.push_back(f);
-			infoFile << "faces\t\t" << F.rows() << endl;
-			avgF += F.rows();
-			minF = min(minF, (int)F.rows());
-			maxF = max(maxF, (int)F.rows());
-			infoFile << "facetype\t"
-					 << "triangle" << endl; // TODO
-			auto minCorner = V.colwise().minCoeff();
-			auto maxCorner = V.colwise().maxCoeff();
-			auto baryCenter = V.colwise().sum() / V.rows();
-			auto scaleFactor = 0.5 / max((baryCenter - minCorner).maxCoeff(), (maxCorner - baryCenter).maxCoeff());
-			infoFile << "mincorner\t" << minCorner << endl;
-			infoFile << "maxcorner\t" << maxCorner << endl;
-			infoFile << "barycenter\t" << baryCenter << endl;
-			infoFile << "scaleFactor\t" << scaleFactor << endl;
-			auto normalized = scaleFactor * (V.rowwise() - baryCenter);
-			// TODO WRITE to file
-
-			infoFile.close();
-			numMeshes++;
-		}
-
-	avgV /= numMeshes;
-	avgF /= numMeshes;
-	printf("# of Vertices:\n\tAvg: %.2f\n\tMin: %i\n\tMax:%i\n# of Faces:\n\tAvg: %.2f\n\tMin: "
-		   "%i\n\tMax: %i\n",
-		   avgV, minV, maxV, avgF, minF, maxF);
-	ofstream toobigFile(ASSET_PATH "toobig.txt"), toosmallFile(ASSET_PATH "toosmall.txt");
-	for (auto &f : toobig)
-		toobigFile << f << endl;
-	for (auto &f : toosmall)
-		toosmallFile << f << endl;
 }
 
 int main(int argc, char *argv[])

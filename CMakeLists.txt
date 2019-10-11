@@ -19,7 +19,7 @@ find_package(LIBIGL REQUIRED QUIET)
 find_package(QHULL REQUIRED QUIET)
 
 # Add your project files
-file( GLOB_RECURSE SRCFILES src/*.cpp src/*.h src/*.c )
+file( GLOB_RECURSE SRCFILES src/*.cpp src/*.h src/*.c src/*.hpp)
 file( GLOB RPLY_FILES include/rply/*.c )
 add_compile_definitions(ASSET_PATH="${CMAKE_CURRENT_SOURCE_DIR}/data/")
 add_executable( ${PROJECT_NAME}_bin ${SRCFILES} ${RPLY_FILES} )
