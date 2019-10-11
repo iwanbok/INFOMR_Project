@@ -24,7 +24,7 @@ file( GLOB RPLY_FILES include/rply/*.c )
 add_compile_definitions(ASSET_PATH="${CMAKE_CURRENT_SOURCE_DIR}/data/")
 add_executable( ${PROJECT_NAME}_bin ${SRCFILES} ${RPLY_FILES} )
 target_link_libraries(${PROJECT_NAME}_bin       PRIVATE igl::core igl::opengl_glfw igl::opengl_glfw_imgui ${qhull_LIBRARIES})
-target_include_directories(${PROJECT_NAME}_bin  PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include ${qhull_INCLUDE_DIRS} ${CMAKE_CURRENT_SOURCE_DIR}/include )
+target_include_directories(${PROJECT_NAME}_bin  PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include ${qhull_INCLUDE_DIRS})
 if(MSVC)
 # enable updated __cplusplus macro value
 if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 19.14)

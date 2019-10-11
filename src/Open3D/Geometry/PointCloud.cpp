@@ -30,7 +30,7 @@
 #include <Eigen/Dense>
 #include <numeric>
 
-#include "KDTreeFlann.h"
+// #include "KDTreeFlann.h"
 #include "Qhull.h"
 
 namespace open3d {
@@ -119,28 +119,28 @@ PointCloud PointCloud::operator+(const PointCloud &cloud) const {
     return (PointCloud(*this) += cloud);
 }
 
-std::vector<double> PointCloud::ComputePointCloudDistance(
-        const PointCloud &target) {
-    std::vector<double> distances(points_.size());
-    KDTreeFlann kdtree;
-    kdtree.SetGeometry(target);
-#ifdef _OPENMP
-#pragma omp parallel for schedule(static)
-#endif
-    for (int i = 0; i < (int)points_.size(); i++) {
-        std::vector<int> indices(1);
-        std::vector<double> dists(1);
-        if (kdtree.SearchKNN(points_[i], 1, indices, dists) == 0) {
-            printf(
-                    "[ComputePointCloudToPointCloudDistance] Found a point "
-                    "without neighbors.\n");
-            distances[i] = 0.0;
-        } else {
-            distances[i] = std::sqrt(dists[0]);
-        }
-    }
-    return distances;
-}
+// std::vector<double> PointCloud::ComputePointCloudDistance(
+//         const PointCloud &target) {
+//     std::vector<double> distances(points_.size());
+//     KDTreeFlann kdtree;
+//     kdtree.SetGeometry(target);
+// #ifdef _OPENMP
+// #pragma omp parallel for schedule(static)
+// #endif
+//     for (int i = 0; i < (int)points_.size(); i++) {
+//         std::vector<int> indices(1);
+//         std::vector<double> dists(1);
+//         if (kdtree.SearchKNN(points_[i], 1, indices, dists) == 0) {
+//             printf(
+//                     "[ComputePointCloudToPointCloudDistance] Found a point "
+//                     "without neighbors.\n");
+//             distances[i] = 0.0;
+//         } else {
+//             distances[i] = std::sqrt(dists[0]);
+//         }
+//     }
+//     return distances;
+// }
 
 PointCloud &PointCloud::RemoveNoneFinitePoints(bool remove_nan,
                                                bool remove_infinite) {
@@ -224,28 +224,28 @@ std::vector<double> PointCloud::ComputeMahalanobisDistance() const {
     return mahalanobis;
 }
 
-std::vector<double> PointCloud::ComputeNearestNeighborDistance() const {
-    std::vector<double> nn_dis(points_.size());
-    KDTreeFlann kdtree(*this);
-#ifdef _OPENMP
-#pragma omp parallel for schedule(static)
-#endif
-    for (int i = 0; i < (int)points_.size(); i++) {
-        std::vector<int> indices(2);
-        std::vector<double> dists(2);
-        if (kdtree.SearchKNN(points_[i], 2, indices, dists) <= 1) {
-#ifndef NDEBUG
-                printf(
-                    "[ComputePointCloudNearestNeighborDistance] Found a point "
-                    "without neighbors.\n");
-#endif
-            nn_dis[i] = 0.0;
-        } else {
-            nn_dis[i] = std::sqrt(dists[1]);
-        }
-    }
-    return nn_dis;
-}
+// std::vector<double> PointCloud::ComputeNearestNeighborDistance() const {
+//     std::vector<double> nn_dis(points_.size());
+//     KDTreeFlann kdtree(*this);
+// #ifdef _OPENMP
+// #pragma omp parallel for schedule(static)
+// #endif
+//     for (int i = 0; i < (int)points_.size(); i++) {
+//         std::vector<int> indices(2);
+//         std::vector<double> dists(2);
+//         if (kdtree.SearchKNN(points_[i], 2, indices, dists) <= 1) {
+// #ifndef NDEBUG
+//                 printf(
+//                     "[ComputePointCloudNearestNeighborDistance] Found a point "
+//                     "without neighbors.\n");
+// #endif
+//             nn_dis[i] = 0.0;
+//         } else {
+//             nn_dis[i] = std::sqrt(dists[1]);
+//         }
+//     }
+//     return nn_dis;
+// }
 
 std::shared_ptr<TriangleMesh> PointCloud::ComputeConvexHull() const {
     return Qhull::ComputeConvexHull(points_);

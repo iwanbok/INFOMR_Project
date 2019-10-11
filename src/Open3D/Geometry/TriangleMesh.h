@@ -315,16 +315,16 @@ public:
     std::shared_ptr<PointCloud> SamplePointsUniformly(
             size_t number_of_points) const;
 
-    /// Function to sample \param number_of_points points (blue noise).
-    /// Based on the method presented in Yuksel, "Sample Elimination for
-    /// Generating Poisson Disk Sample Sets", EUROGRAPHICS, 2015 The PointCloud
-    /// \param pcl_init is used for sample elimination if given, otherwise a
-    /// PointCloud is first uniformly sampled with \param init_number_of_points
-    /// x \param number_of_points number of points.
-    std::shared_ptr<PointCloud> SamplePointsPoissonDisk(
-            size_t number_of_points,
-            double init_factor = 5,
-            const std::shared_ptr<PointCloud> pcl_init = nullptr) const;
+//     /// Function to sample \param number_of_points points (blue noise).
+//     /// Based on the method presented in Yuksel, "Sample Elimination for
+//     /// Generating Poisson Disk Sample Sets", EUROGRAPHICS, 2015 The PointCloud
+//     /// \param pcl_init is used for sample elimination if given, otherwise a
+//     /// PointCloud is first uniformly sampled with \param init_number_of_points
+//     /// x \param number_of_points number of points.
+//     std::shared_ptr<PointCloud> SamplePointsPoissonDisk(
+//             size_t number_of_points,
+//             double init_factor = 5,
+//             const std::shared_ptr<PointCloud> pcl_init = nullptr) const;
 
     /// Function to subdivide triangle mesh using the simple midpoint algorithm.
     /// Each triangle is subdivided into four triangles per iteration and the

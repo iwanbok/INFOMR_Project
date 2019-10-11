@@ -29,7 +29,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <cstdlib>
-#ifdef WINDOWS
+#ifdef WIN32
 #include <direct.h>
 #include <dirent/dirent.h>
 #ifndef PATH_MAX
@@ -109,7 +109,7 @@ bool DirectoryExists(const std::string &directory) {
 }
 
 bool MakeDirectory(const std::string &directory) {
-#ifdef WINDOWS
+#ifdef WIN32
     return (_mkdir(directory.c_str()) == 0);
 #else
     return (mkdir(directory.c_str(), S_IRWXU) == 0);
@@ -132,7 +132,7 @@ bool MakeDirectoryHierarchy(const std::string &directory) {
 }
 
 bool DeleteDirectory(const std::string &directory) {
-#ifdef WINDOWS
+#ifdef WIN32
     return (_rmdir(directory.c_str()) == 0);
 #else
     return (rmdir(directory.c_str()) == 0);
@@ -140,7 +140,7 @@ bool DeleteDirectory(const std::string &directory) {
 }
 
 bool FileExists(const std::string &filename) {
-#ifdef WINDOWS
+#ifdef WIN32
     struct _stat64 info;
     if (_stat64(filename.c_str(), &info) == -1) return false;
     return S_ISREG(info.st_mode);

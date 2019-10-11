@@ -32,7 +32,7 @@
 #include <vector>
 
 #include "Geometry3D.h"
-#include "KDTreeSearchParam.h"
+//#include "KDTreeSearchParam.h"
 
 namespace open3d {
 
@@ -136,14 +136,14 @@ public:
     std::tuple<std::shared_ptr<PointCloud>, std::vector<size_t>>
     RemoveStatisticalOutliers(size_t nb_neighbors, double std_ratio) const;
 
-    /// Function to compute the normals of a point cloud
-    /// \param cloud is the input point cloud. It also stores the output
-    /// normals. Normals are oriented with respect to the input point cloud if
-    /// normals exist in the input. \param search_param The KDTree search
-    /// parameters
-    bool EstimateNormals(
-            const KDTreeSearchParam &search_param = KDTreeSearchParamKNN(),
-            bool fast_normal_computation = true);
+    // /// Function to compute the normals of a point cloud
+    // /// \param cloud is the input point cloud. It also stores the output
+    // /// normals. Normals are oriented with respect to the input point cloud if
+    // /// normals exist in the input. \param search_param The KDTree search
+    // /// parameters
+    // bool EstimateNormals(
+    //         const KDTreeSearchParam &search_param = KDTreeSearchParamKNN(),
+    //         bool fast_normal_computation = true);
 
     /// Function to orient the normals of a point cloud
     /// \param cloud is the input point cloud. It must have normals.
@@ -158,12 +158,12 @@ public:
     bool OrientNormalsTowardsCameraLocation(
             const Eigen::Vector3d &camera_location = Eigen::Vector3d::Zero());
 
-    /// Function to compute the point to point distances between point clouds
-    /// \param source is the first point cloud.
-    /// \param target is the second point cloud.
-    /// \return the output distance. It has the same size as the number
-    /// of points in \param source
-    std::vector<double> ComputePointCloudDistance(const PointCloud &target);
+    // /// Function to compute the point to point distances between point clouds
+    // /// \param source is the first point cloud.
+    // /// \param target is the second point cloud.
+    // /// \return the output distance. It has the same size as the number
+    // /// of points in \param source
+    // std::vector<double> ComputePointCloudDistance(const PointCloud &target);
 
     /// Function to compute the mean and covariance matrix
     /// of an \param input point cloud
@@ -175,21 +175,21 @@ public:
     /// https://en.wikipedia.org/wiki/Mahalanobis_distance
     std::vector<double> ComputeMahalanobisDistance() const;
 
-    /// Function to compute the distance from a point to its nearest neighbor in
-    /// the \param input point cloud
-    std::vector<double> ComputeNearestNeighborDistance() const;
+    // /// Function to compute the distance from a point to its nearest neighbor in
+    // /// the \param input point cloud
+    // std::vector<double> ComputeNearestNeighborDistance() const;
 
     /// Function that computes the convex hull of the point cloud using qhull
     std::shared_ptr<TriangleMesh> ComputeConvexHull() const;
 
-    /// Cluster PointCloud using the DBSCAN algorithm
-    /// Ester et al., "A Density-Based Algorithm for Discovering Clusters
-    /// in Large Spatial Databases with Noise", 1996
-    /// Returns a vector of point labels, -1 indicates noise according to
-    /// the algorithm.
-    std::vector<int> ClusterDBSCAN(double eps,
-                                   size_t min_points,
-                                   bool print_progress = false) const;
+    // /// Cluster PointCloud using the DBSCAN algorithm
+    // /// Ester et al., "A Density-Based Algorithm for Discovering Clusters
+    // /// in Large Spatial Databases with Noise", 1996
+    // /// Returns a vector of point labels, -1 indicates noise according to
+    // /// the algorithm.
+    // std::vector<int> ClusterDBSCAN(double eps,
+    //                                size_t min_points,
+    //                                bool print_progress = false) const;
 
     // /// Factory function to create a pointcloud from a depth image and a camera
     // /// model (PointCloudFactory.cpp)
