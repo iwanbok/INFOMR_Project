@@ -5,6 +5,7 @@
 #include <iostream>
 #include <sstream>
 #include <vector>
+#include <filesystem>
 
 #include "EigenVectors.hpp"
 
@@ -32,7 +33,7 @@ std::vector<std::string> split(std::string strToSplit, char delimeter)
 	return splittedStrings;
 }
 
-void simplify(std::string file, int targetF)
+void simplify(const std::string &file, int targetF)
 {
 	auto mesh = open3d::io::CreateMeshFromFile(file);
 	mesh->RemoveDuplicatedTriangles();
@@ -41,7 +42,44 @@ void simplify(std::string file, int targetF)
 	mesh->RemoveUnreferencedVertices();
 	auto mesh2 = mesh->SubdivideLoop(1);
 	auto mesh_simple = mesh2->SimplifyQuadricDecimation(targetF);
-	open3d::io::WriteTriangleMesh(file.substr(0, file.size() - 4) + "_cleaned.off", *mesh2, true, true);
+	open3d::io::WriteTriangleMesh(file.substr(0, file.size() - 4) + "_cleaned.off", *mesh2, true,
+								  true);
+}
+
+void WriteInfoFile(const std::string &file,
+				   const std::shared_ptr<open3d::geometry::TriangleMesh> &mesh, double scaleFactor,
+				   const Eigen::Matrix3d &evecs, const Eigen::Vector3d &evals)
+{
+	std::ofstream infoFile;
+	infoFile.open(file + ".info");
+	// mesh
+	infoFile << file << std::endl;
+	// class
+	std::filesystem::path p(file);
+	auto parent = p.parent_path();
+	infoFile << parent.string().substr(parent.parent_path().string().size() + 1) << std::endl;
+	// # vertices
+	infoFile << mesh->vertices_.size() << std::endl;
+	// # faces
+	infoFile << mesh->triangles_.size() << std::endl;
+	// Minimal corner
+	infoFile << mesh->GetMinBound().transpose() << std::endl;
+	// Maximal corner
+	infoFile << mesh->GetMaxBound().transpose() << std::endl;
+	// Barycenter
+	infoFile << mesh->GetCenter().transpose() << std::endl;
+	// Scale factor TODO
+	infoFile << scaleFactor << std::endl;
+	// Eigen Values
+	infoFile << evals.transpose() << std::endl;
+	// Major Eigen vector
+	infoFile << evecs.col(0).transpose() << std::endl;
+	// Medium Eigen vector
+	infoFile << evecs.col(1).transpose() << std::endl;
+	// Minor Eigen vector
+	infoFile << evecs.col(2).transpose() << std::endl;
+
+	infoFile.close();
 }
 
 void preProcessMeshDatabase(const std::vector<std::string> &files)
@@ -49,64 +87,42 @@ void preProcessMeshDatabase(const std::vector<std::string> &files)
 	float avgV = 0, avgF = 0;
 	int minV = INT_MAX, maxV = 0, minF = INT_MAX, maxF = 0, numMeshes = 0;
 	std::vector<std::string> outlier;
-	Eigen::MatrixXd V;
-	Eigen::MatrixXi F;
 
 	for (auto &f : files)
 		if ((endsWith(f, ".off") || endsWith(f, ".ply")) && !endsWith(f, "_scaled.off") &&
 			find(files.begin(), files.end(), f.substr(0, f.size() - 4) + "_cleaned.off") ==
 				files.end())
 		{
-			auto splitted = split(f, '\\');
 			auto mesh = open3d::io::CreateMeshFromFile(f);
-			V = Eigen::Map<Eigen::MatrixX3d>((double *)mesh->vertices_.data(),
-											 mesh->vertices_.size(), 3);
-			F = Eigen::Map<Eigen::MatrixX3i>((int *)mesh->triangles_.data(),
-											 mesh->triangles_.size(), 3);
 
-			std::ofstream infoFile;
-			infoFile.open(f + ".info");
-			infoFile << "mesh\t\t" << f << std::endl;
-			infoFile << "class\t\t" << splitted[std::max((int)splitted.size() - 2, 0)] << std::endl;
-			infoFile << "vertices\t" << V.rows() << std::endl;
-			infoFile << "faces\t\t" << F.rows() << std::endl;
-			infoFile << "facetype\t"
-					 << "triangle" << std::endl; // TODO
-			auto minCorner = V.colwise().minCoeff();
-			auto maxCorner = V.colwise().maxCoeff();
-			auto baryCenter = V.colwise().sum() / V.rows();
-			auto scaleFactor = 0.5 / std::max((baryCenter - minCorner).maxCoeff(),
-											  (maxCorner - baryCenter).maxCoeff());
-			auto evecs = ComputeEigenVectors(V);
-			infoFile << "mincorner\t" << minCorner << std::endl;
-			infoFile << "maxcorner\t" << maxCorner << std::endl;
-			infoFile << "barycenter\t" << baryCenter << std::endl;
-			infoFile << "scaleFactor\t" << scaleFactor << std::endl;
-			infoFile << "majoreigenvector\t" << evecs.col(0).transpose() << std::endl;
-			infoFile << "mediumeigenvector\t" << evecs.col(1).transpose() << std::endl;
-			infoFile << "minoreigenvector\t" << evecs.col(2).transpose() << std::endl;
+			auto scaleFactor = 0.5 / std::max((mesh->GetCenter() - mesh->GetMinBound()).maxCoeff(),
+											  (mesh->GetMaxBound() - mesh->GetCenter()).maxCoeff());
+			Eigen::Vector3d evals;
+			Eigen::Matrix3d evecs;
+			std::tie(evals, evecs) = ComputeEigenValuesAndVectors(mesh->vertices_);
 
-			infoFile.close();
+			int v_count = mesh->vertices_.size();
+			avgV += v_count;
+			minV = std::min(minV, v_count);
+			maxV = std::max(maxV, v_count);
 
-			avgV += V.rows();
-			minV = std::min(minV, (int)V.rows());
-			maxV = std::max(maxV, (int)V.rows());
+			int f_count = mesh->triangles_.size();
+			avgF += f_count;
+			minF = std::min(minF, f_count);
+			maxF = std::max(maxF, f_count);
 
-			avgF += F.rows();
-			minF = std::min(minF, (int)F.rows());
-			maxF = std::max(maxF, (int)F.rows());
-
-			if (F.rows() > 30000 || F.rows() < 10000)
+			if (f_count > 30000 || f_count < 10000)
 				outlier.push_back(f);
+			else
+				WriteInfoFile(f, mesh, scaleFactor, evecs, evals);			
 
-			auto centered = V.rowwise() - baryCenter;
-            std::vector<Eigen::Vector3d> new_v(centered.rows());
-            for(int i = 0; i < centered.rows(); i++)
-                new_v.push_back(centered.row(i) * evecs.transpose());
-            open3d::geometry::TriangleMesh new_mesh(*mesh);
-            new_mesh.vertices_ = new_v;
-                        
-            open3d::io::WriteTriangleMesh(f.substr(0, f.size() - 4) + "_scaled.off", new_mesh, true, true);
+			mesh->Translate(-mesh->GetCenter());
+			Eigen::Affine3d transform;
+			transform.linear() << evecs.transpose();
+			mesh->Transform(transform.matrix());
+
+			open3d::io::WriteTriangleMesh(f.substr(0, f.size() - 4) + "_scaled.off", *mesh, true,
+										  true);
 			numMeshes++;
 		}
 

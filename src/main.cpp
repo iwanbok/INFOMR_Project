@@ -2,17 +2,17 @@
 #define ASSET_PATH "data"
 #endif
 
+#include <igl/eigs.h>
 #include <igl/opengl/glfw/Viewer.h>
 #include <igl/opengl/glfw/imgui/ImGuiHelpers.h>
 #include <igl/opengl/glfw/imgui/ImGuiMenu.h>
 #include <igl/read_triangle_mesh.h>
-#include <igl/eigs.h>
 #include <imgui/imgui.h>
 
 #include <algorithm>
 #include <filesystem>
-#include <iostream>
 #include <fstream>
+#include <iostream>
 #include <string>
 #include <vector>
 
@@ -117,15 +117,17 @@ int main(int argc, char *argv[])
 	vector<string> files = getAllFilesInDir(ASSET_PATH "LabeledDB_new/");
 	preProcessMeshDatabase(files);
 
-	ifstream info(ASSET_PATH "LabeledDB_new/Armadillo/281_cleaned_scaled.off");
+	igl::opengl::glfw::Viewer viewer;
+#if 0
+	ifstream info(ASSET_PATH "LabeledDB_new/Armadillo/281_cleaned.off.info");
 	string bin;
-	for(int i = 0; i < 10; i++, getline(info, bin));
+	for(int i = 0; i < 9; i++, getline(info, bin));
 	double x, y, z;
-	info >> bin >> x >> y >> z;
+	info >> x >> y >> z;
 	RowVector3d evec0(x, y, z);
-	info >> bin >> x >> y >> z;
+	info >> x >> y >> z;
 	RowVector3d evec1(x, y, z);
-	info >> bin >> x >> y >> z;
+	info >> x >> y >> z;
 	RowVector3d evec2(x, y, z);
 	MatrixXd points(4, 3);
 	points << RowVector3d::Zero(), evec0, evec1, evec2;
@@ -135,11 +137,12 @@ int main(int argc, char *argv[])
 	C << 1, 0, 0, 0, 1, 0, 0, 0, 1;
 	// Load a mesh in OFF format
 	igl::readOFF(ASSET_PATH "LabeledDB_new/Armadillo/281_cleaned.off", V, F);
-
-	igl::opengl::glfw::Viewer viewer;
+	viewer.data().set_edges(points, indices, C);
+#else
+	igl::readOFF(ASSET_PATH "LabeledDB_new/Armadillo/281_cleaned_scaled.off", V, F);
+#endif
 
 	viewer.data().set_mesh(V, F);
-	viewer.data().set_edges(points, indices, C);
 
 	viewer.callback_key_down = &key_down;
 	viewer.plugins.push_back(&menu);
