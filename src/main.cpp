@@ -2,7 +2,12 @@
 #define ASSET_PATH "data"
 #endif
 
-#include <igl/eigs.h>
+#define ORIGINAL_DIR ASSET_PATH "LabeledDB_new"
+#define PREPROCESSED_DIR ASSET_PATH "preprocessed"
+#define NORMALIZED_DIR ASSET_PATH "normalized"
+#define FEATURE_DIR ASSET_PATH "features"
+#define INFO_DIR ASSET_PATH "info"
+
 #include <igl/opengl/glfw/Viewer.h>
 #include <igl/opengl/glfw/imgui/ImGuiHelpers.h>
 #include <igl/opengl/glfw/imgui/ImGuiMenu.h>
@@ -19,11 +24,11 @@
 #include "Open3D/Geometry/TriangleMesh.h"
 #include "Open3D/IO/TriangleMeshIO.h"
 
+#include "Normalize.hpp"
 #include "PreProcess.hpp"
 
 using namespace Eigen;
 using namespace std;
-namespace filesys = std::filesystem;
 
 MatrixXd V;
 MatrixXi F;
@@ -52,70 +57,38 @@ bool key_down(igl::opengl::glfw::Viewer &viewer, unsigned char key, int modifier
 	return false;
 }
 
-// Based on
-// https://thispointer.com/c-get-the-list-of-all-files-in-a-given-directory-and-its-sub-directories-using-boost-c17/
-/*
- * Get the list of all files in given directory and its sub directories.
- *
- * Arguments
- * 	dirPath : Path of directory to be traversed
- * 	dirSkipList : List of folder names to be skipped
- *
- * Returns:
- * 	vector containing paths of all the files in given directory and its sub directories
- *
- */
-vector<string> getAllFilesInDir(const string &dirPath, const vector<string> dirSkipList = {})
-{
-
-	// Create a vector of string
-	std::vector<string> listOfFiles;
-	try
-	{
-		// Check if given path exists and points to a directory
-		if (filesys::exists(dirPath) && filesys::is_directory(dirPath))
-		{
-			// Create a Recursive Directory Iterator object and points to the starting of directory
-			filesys::recursive_directory_iterator iter(dirPath);
-
-			// Create a Recursive Directory Iterator object pointing to end.
-			filesys::recursive_directory_iterator end;
-
-			// Iterate till end
-			while (iter != end)
-			{
-				// Check if current entry is a directory and if exists in skip list
-				if (filesys::is_directory(iter->path()) &&
-					(std::find(dirSkipList.begin(), dirSkipList.end(), iter->path().filename()) !=
-					 dirSkipList.end()))
-					// Skip the iteration of current directory pointed by iterator
-					iter.disable_recursion_pending();
-				else if (!filesys::is_directory(iter->path()))
-					// Add the name in vector
-					listOfFiles.push_back(iter->path().string());
-
-				error_code ec;
-				// Increment the iterator to point to next entry in recursive iteration
-				iter.increment(ec);
-				if (ec)
-				{
-					cerr << "Error While Accessing : " << iter->path().string()
-						 << " :: " << ec.message() << endl;
-				}
-			}
-		}
-	}
-	catch (system_error &e)
-	{
-		cerr << "Exception :: " << e.what();
-	}
-	return listOfFiles;
-}
-
 int main(int argc, char *argv[])
 {
-	vector<string> files = getAllFilesInDir(ASSET_PATH "LabeledDB_new/");
-	preProcessMeshDatabase(files);
+	if (cmdOptionExists(argc, argv, "-h"))
+	{
+		cout << "Command line options:" << endl
+			 << "\t-p: Skip database preprocessing" << endl
+			 << "\t-n: Skip database normalization" << endl
+			 << "\t-f: Skip database feature calculations" << endl;
+		return EXIT_SUCCESS;
+	}
+	if (!cmdOptionExists(argc, argv, "-p"))
+	{
+		vector<filesystem::path> originals = getAllFilesInDir(ORIGINAL_DIR);
+		if(!filesystem::exists(PREPROCESSED_DIR))
+			filesystem::create_directories(PREPROCESSED_DIR);
+		PreProcessMeshDatabase(originals);
+	}
+
+	if (!cmdOptionExists(argc, argv, "-n"))
+	{
+		vector<filesystem::path> preprossed = getAllFilesInDir(PREPROCESSED_DIR);
+		if(!filesystem::exists(NORMALIZED_DIR))
+			filesystem::create_directories(NORMALIZED_DIR);
+		NormalizeMeshDataBase(preprossed);
+	}
+
+	if (!cmdOptionExists(argc, argv, "-f"))
+	{
+		vector<filesystem::path> normalized = getAllFilesInDir(NORMALIZED_DIR);
+		if(!filesystem::exists(FEATURE_DIR))
+			filesystem::create_directories(FEATURE_DIR);
+	}
 
 	igl::opengl::glfw::Viewer viewer;
 #if 0
@@ -139,7 +112,7 @@ int main(int argc, char *argv[])
 	igl::readOFF(ASSET_PATH "LabeledDB_new/Armadillo/281_cleaned.off", V, F);
 	viewer.data().set_edges(points, indices, C);
 #else
-	igl::readOFF(ASSET_PATH "LabeledDB_new/Armadillo/281_cleaned_scaled.off", V, F);
+	igl::readOFF(NORMALIZED_DIR "/Armadillo/281.off", V, F);
 #endif
 
 	viewer.data().set_mesh(V, F);
