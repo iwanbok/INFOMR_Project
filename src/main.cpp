@@ -26,6 +26,7 @@
 
 #include "Normalize.hpp"
 #include "PreProcess.hpp"
+#include "Features.hpp"
 
 using namespace Eigen;
 using namespace std;
@@ -88,6 +89,7 @@ int main(int argc, char *argv[])
 		vector<filesystem::path> normalized = getAllFilesInDir(NORMALIZED_DIR);
 		if(!filesystem::exists(FEATURE_DIR))
 			filesystem::create_directories(FEATURE_DIR);
+		CalculateFeaturesMeshDatabase(normalized);
 	}
 
 	igl::opengl::glfw::Viewer viewer;
