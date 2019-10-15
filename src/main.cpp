@@ -60,7 +60,8 @@ bool key_down(igl::opengl::glfw::Viewer &viewer, unsigned char key, int modifier
 
 int main(int argc, char *argv[])
 {
-	if (cmdOptionExists(argc, argv, "-h"))
+	string options = GetCmdOptions(argc, argv);
+	if (options.find('h') != options.npos)
 	{
 		cout << "Command line options:" << endl
 			 << "\t-p: Skip database preprocessing" << endl
@@ -68,7 +69,7 @@ int main(int argc, char *argv[])
 			 << "\t-f: Skip database feature calculations" << endl;
 		return EXIT_SUCCESS;
 	}
-	if (!cmdOptionExists(argc, argv, "-p"))
+	if (options.find('p') == options.npos)
 	{
 		vector<filesystem::path> originals = getAllFilesInDir(ORIGINAL_DIR);
 		if(!filesystem::exists(PREPROCESSED_DIR))
@@ -76,7 +77,7 @@ int main(int argc, char *argv[])
 		PreProcessMeshDatabase(originals);
 	}
 
-	if (!cmdOptionExists(argc, argv, "-n"))
+	if (options.find('n') == options.npos)
 	{
 		vector<filesystem::path> preprossed = getAllFilesInDir(PREPROCESSED_DIR);
 		if(!filesystem::exists(NORMALIZED_DIR))
@@ -84,7 +85,7 @@ int main(int argc, char *argv[])
 		NormalizeMeshDataBase(preprossed);
 	}
 
-	if (!cmdOptionExists(argc, argv, "-f"))
+	if (options.find('f') == options.npos)
 	{
 		vector<filesystem::path> normalized = getAllFilesInDir(NORMALIZED_DIR);
 		if(!filesystem::exists(FEATURE_DIR))
@@ -93,29 +94,7 @@ int main(int argc, char *argv[])
 	}
 
 	igl::opengl::glfw::Viewer viewer;
-#if 0
-	ifstream info(ASSET_PATH "LabeledDB_new/Armadillo/281_cleaned.off.info");
-	string bin;
-	for(int i = 0; i < 9; i++, getline(info, bin));
-	double x, y, z;
-	info >> x >> y >> z;
-	RowVector3d evec0(x, y, z);
-	info >> x >> y >> z;
-	RowVector3d evec1(x, y, z);
-	info >> x >> y >> z;
-	RowVector3d evec2(x, y, z);
-	MatrixXd points(4, 3);
-	points << RowVector3d::Zero(), evec0, evec1, evec2;
-	MatrixXi indices(3, 2);
-	indices << 0, 1, 0, 2, 0, 3;
-	Matrix3d C;
-	C << 1, 0, 0, 0, 1, 0, 0, 0, 1;
-	// Load a mesh in OFF format
-	igl::readOFF(ASSET_PATH "LabeledDB_new/Armadillo/281_cleaned.off", V, F);
-	viewer.data().set_edges(points, indices, C);
-#else
 	igl::readOFF(NORMALIZED_DIR "/Armadillo/281.off", V, F);
-#endif
 
 	viewer.data().set_mesh(V, F);
 

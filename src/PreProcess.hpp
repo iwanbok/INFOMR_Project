@@ -12,16 +12,17 @@
 #include "EigenVectors.hpp"
 #include "Utils.hpp"
 
-void Simplify(const std::filesystem::path &file, int targetF)
+void PreProcess(std::shared_ptr<open3d::geometry::TriangleMesh> &mesh)
 {
-	auto mesh = open3d::io::CreateMeshFromFile(file.string());
 	mesh->RemoveDuplicatedTriangles();
 	mesh->RemoveDuplicatedVertices();
 	mesh->RemoveDegenerateTriangles();
 	mesh->RemoveUnreferencedVertices();
-	auto mesh2 = mesh->SubdivideLoop(1);
-	auto mesh_simple = mesh2->SimplifyQuadricDecimation(targetF);
-	open3d::io::WriteTriangleMesh(replaceDir(file, PREPROCESSED_DIR), *mesh_simple, true, true);
+	if (mesh->triangles_.size() < lowerBoundF)
+		while (mesh->triangles_.size() < targetF)
+			mesh = mesh->SubdivideLoop(1);
+	if (mesh->triangles_.size() > upperBoundF)
+		mesh = mesh->SimplifyQuadricDecimation(targetF);
 }
 
 void WriteInfoFile(const std::filesystem::path &file,
@@ -50,41 +51,13 @@ void WriteInfoFile(const std::filesystem::path &file,
 
 void PreProcessMeshDatabase(const std::vector<std::filesystem::path> &files)
 {
-	float avgV = 0, avgF = 0;
-	int minV = INT_MAX, maxV = 0, minF = INT_MAX, maxF = 0, numMeshes = 0;
-	std::vector<std::filesystem::path> outlier;
-
+	CalcMeshStatistics(files);
 	for (auto &f : files)
-		if (f.extension().string().compare(".off") == 0 ||
-			f.extension().string().compare(".ply") == 0)
+		if (std::find(exts.begin(), exts.end(), f.extension().string()) != exts.end())
 		{
 			auto mesh = open3d::io::CreateMeshFromFile(f.string());
-
-			int v_count = mesh->vertices_.size();
-			avgV += v_count;
-			minV = std::min(minV, v_count);
-			maxV = std::max(maxV, v_count);
-
-			int f_count = mesh->triangles_.size();
-			avgF += f_count;
-			minF = std::min(minF, f_count);
-			maxF = std::max(maxF, f_count);
-
-			if (f_count > 30000 || f_count < 10000)
-				outlier.push_back(f);
-			else
-			{
-				WriteInfoFile(f, mesh);
-				open3d::io::WriteTriangleMesh(replaceDir(f, PREPROCESSED_DIR), *mesh, true, true);
-			}
-			numMeshes++;
+			PreProcess(mesh);
+			WriteInfoFile(f, mesh);
+			open3d::io::WriteTriangleMesh(replaceDir(f, PREPROCESSED_DIR), *mesh, true, true);
 		}
-
-	avgV /= numMeshes;
-	avgF /= numMeshes;
-	printf("# of Vertices:\n\tAvg: %.2f\n\tMin: %i\n\tMax:%i\n# of Faces:\n\tAvg: %.2f\n\tMin: "
-		   "%i\n\tMax: %i\n",
-		   avgV, minV, maxV, avgF, minF, maxF);
-	for (auto &f : outlier)
-		Simplify(f, (int)avgF);
 }

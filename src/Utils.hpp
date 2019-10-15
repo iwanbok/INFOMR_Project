@@ -6,6 +6,52 @@
 #include <string>
 #include <vector>
 
+std::vector<std::string> exts = {".off", ".ply", ".stl"};
+
+int lowerBoundF = 15000, targetF = 20000, upperBoundF = 25000;
+void CalcMeshStatistics(const std::vector<std::filesystem::path> &files)
+{
+	float avgV = 0, avgF = 0;
+	int minV = INT_MAX, maxV = 0, minF = INT_MAX, maxF = 0, numMeshes = 0;
+
+	for (auto &f : files)
+		if (std::find(exts.begin(), exts.end(), f.extension().string()) != exts.end())
+		{
+			auto mesh = open3d::io::CreateMeshFromFile(f.string());
+
+			int v_count = mesh->vertices_.size();
+			avgV += v_count;
+			minV = std::min(minV, v_count);
+			maxV = std::max(maxV, v_count);
+
+			int f_count = mesh->triangles_.size();
+			avgF += f_count;
+			minF = std::min(minF, f_count);
+			maxF = std::max(maxF, f_count);
+			numMeshes++;
+		}
+
+	avgV /= numMeshes;
+	avgF /= numMeshes;
+	targetF = int(avgF);
+	lowerBoundF = int(avgF * 0.75f);
+	upperBoundF = int(avgF * 1.25f);
+	printf("# of Vertices:\n\tAvg: %.2f\n\tMin: %i\n\tMax:%i\n# of Faces:\n\tAvg: %.2f\n\tMin: "
+		   "%i\n\tMax: %i\n",
+		   avgV, minV, maxV, avgF, minF, maxF);
+}
+
+std::string GetCmdOptions(int argc, char **argv)
+{
+	std::string result;
+	for (size_t i = 0; i < argc; i++)
+		if (argv[i][0] == '-')
+			result += std::string(&argv[i][1]);
+			
+
+	return result;
+}
+
 char *getCmdOption(int argc, char **argv, const std::string &option)
 {
 	char **itr = std::find(argv, argv + argc, option);
@@ -23,9 +69,9 @@ bool cmdOptionExists(int argc, char **argv, const std::string &option)
 
 std::filesystem::path replaceDir(std::filesystem::path old, std::string newPath)
 {
-    auto dir = std::filesystem::path(newPath) / old.parent_path().filename();
-    if(!std::filesystem::exists(dir))
-        std::filesystem::create_directories(dir);
+	auto dir = std::filesystem::path(newPath) / old.parent_path().filename();
+	if (!std::filesystem::exists(dir))
+		std::filesystem::create_directories(dir);
 	return dir / old.filename();
 }
 
