@@ -17,6 +17,7 @@ void Normalize(const std::shared_ptr<open3d::geometry::TriangleMesh> &mesh)
 	Eigen::Affine3d transform;
 	transform.linear() << evecs.transpose();
 	mesh->Transform(transform.matrix());
+	// TODO Moment test
 	mesh->Scale(1 / (mesh->GetMaxBound() - mesh->GetMinBound()).maxCoeff());
 }
 

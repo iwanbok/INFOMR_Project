@@ -1,5 +1,5 @@
 #ifndef ASSET_PATH
-#define ASSET_PATH "data"
+#define ASSET_PATH "data/"
 #endif
 
 #define ORIGINAL_DIR ASSET_PATH "LabeledDB_new"
@@ -85,13 +85,20 @@ int main(int argc, char *argv[])
 		NormalizeMeshDataBase(preprossed);
 	}
 
+	std::vector<Features> features;
 	if (options.find('f') == options.npos)
 	{
 		vector<filesystem::path> normalized = getAllFilesInDir(NORMALIZED_DIR);
 		if(!filesystem::exists(FEATURE_DIR))
 			filesystem::create_directories(FEATURE_DIR);
-		CalculateFeaturesMeshDatabase(normalized);
+		features = CalculateFeaturesMeshDatabase(normalized);
 	}
+	else
+	{
+		vector<filesystem::path> featurefiles = getAllFilesInDir(FEATURE_DIR);
+		features = ReadFeatureDatabase(featurefiles);
+	}
+	cout << features[0] << endl;
 
 	igl::opengl::glfw::Viewer viewer;
 	igl::readOFF(NORMALIZED_DIR "/Armadillo/281.off", V, F);
