@@ -58,6 +58,6 @@ void PreProcessMeshDatabase(const std::vector<std::filesystem::path> &files)
 			auto mesh = open3d::io::CreateMeshFromFile(f.string());
 			PreProcess(mesh);
 			WriteInfoFile(f, mesh);
-			open3d::io::WriteTriangleMesh(replaceDir(f, PREPROCESSED_DIR), *mesh, true, true);
+			open3d::io::WriteTriangleMesh(replaceDir(f, PREPROCESSED_DIR).string(), *mesh, true, true);
 		}
 }

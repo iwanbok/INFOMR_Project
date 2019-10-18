@@ -234,31 +234,31 @@ public:
     /// (Two or more faces connected only by a vertex and not by an edge.)
     bool IsVertexManifold() const;
 
-//     /// Function that returns a list of triangles that are intersecting the
-//     /// mesh.
-//     std::vector<Eigen::Vector2i> GetSelfIntersectingTriangles() const;
+    /// Function that returns a list of triangles that are intersecting the
+    /// mesh.
+    std::vector<Eigen::Vector2i> GetSelfIntersectingTriangles() const;
 
-//     /// Function that tests if the triangle mesh is self-intersecting.
-//     /// Tests each triangle pair for intersection.
-//     bool IsSelfIntersecting() const;
+    /// Function that tests if the triangle mesh is self-intersecting.
+    /// Tests each triangle pair for intersection.
+    bool IsSelfIntersecting() const;
 
-//     /// Function that tests if the bounding boxes of the triangle meshes are
-//     /// intersecting.
-//     bool IsBoundingBoxIntersecting(const TriangleMesh &other) const;
+    /// Function that tests if the bounding boxes of the triangle meshes are
+    /// intersecting.
+    bool IsBoundingBoxIntersecting(const TriangleMesh &other) const;
 
-//     /// Function that tests if the triangle mesh intersects another triangle
-//     /// mesh. Tests each triangle against each other triangle.
-//     bool IsIntersecting(const TriangleMesh &other) const;
+    /// Function that tests if the triangle mesh intersects another triangle
+    /// mesh. Tests each triangle against each other triangle.
+    bool IsIntersecting(const TriangleMesh &other) const;
 
     /// Function that tests if the given triangle mesh is orientable, i.e.
     /// the triangles can oriented in such a way that all normals point
     /// towards the outside.
     bool IsOrientable() const;
 
-//     /// Function that tests if the given triangle mesh is watertight by
-//     /// checking if it is vertex manifold and edge-manifold with no boundary
-//     /// edges, but not self-intersecting.
-//     bool IsWatertight() const;
+    /// Function that tests if the given triangle mesh is watertight by
+    /// checking if it is vertex manifold and edge-manifold with no boundary
+    /// edges, but not self-intersecting.
+    bool IsWatertight() const;
 
     /// If the mesh is orientable then this function rearranges the
     /// triangles such that all normals point towards the

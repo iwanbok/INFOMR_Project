@@ -26,7 +26,7 @@
 
 #include "TriangleMesh.h"
 #include "BoundingVolume.h"
-// #include "IntersectionTest.h"
+#include "IntersectionTest.h"
 //#include "KDTreeFlann.h"
 #include "PointCloud.h"
 #include "Qhull.h"
@@ -1047,9 +1047,9 @@ bool TriangleMesh::IsOrientable() const {
     return OrientTriangleHelper(triangles_, NoOp);
 }
 
-// bool TriangleMesh::IsWatertight() const {
-//     return IsEdgeManifold(false) && IsVertexManifold() && !IsSelfIntersecting();
-// }
+bool TriangleMesh::IsWatertight() const {
+    return IsEdgeManifold(false) && IsVertexManifold() && !IsSelfIntersecting();
+}
 
 bool TriangleMesh::OrientTriangles() {
     auto SwapTriangleOrder = [&](int tidx, int idx0, int idx1) {
@@ -1252,68 +1252,68 @@ bool TriangleMesh::IsVertexManifold() const {
     return GetNonManifoldVertices().empty();
 }
 
-// std::vector<Eigen::Vector2i> TriangleMesh::GetSelfIntersectingTriangles()
-//         const {
-//     std::vector<Eigen::Vector2i> self_intersecting_triangles;
-//     for (size_t tidx0 = 0; tidx0 < triangles_.size() - 1; ++tidx0) {
-//         const Eigen::Vector3i &tria_p = triangles_[tidx0];
-//         const Eigen::Vector3d &p0 = vertices_[tria_p(0)];
-//         const Eigen::Vector3d &p1 = vertices_[tria_p(1)];
-//         const Eigen::Vector3d &p2 = vertices_[tria_p(2)];
-//         for (size_t tidx1 = tidx0 + 1; tidx1 < triangles_.size(); ++tidx1) {
-//             const Eigen::Vector3i &tria_q = triangles_[tidx1];
-//             // check if neighbour triangle
-//             if (tria_p(0) == tria_q(0) || tria_p(0) == tria_q(1) ||
-//                 tria_p(0) == tria_q(2) || tria_p(1) == tria_q(0) ||
-//                 tria_p(1) == tria_q(1) || tria_p(1) == tria_q(2) ||
-//                 tria_p(2) == tria_q(0) || tria_p(2) == tria_q(1) ||
-//                 tria_p(2) == tria_q(2)) {
-//                 continue;
-//             }
+std::vector<Eigen::Vector2i> TriangleMesh::GetSelfIntersectingTriangles()
+        const {
+    std::vector<Eigen::Vector2i> self_intersecting_triangles;
+    for (size_t tidx0 = 0; tidx0 < triangles_.size() - 1; ++tidx0) {
+        const Eigen::Vector3i &tria_p = triangles_[tidx0];
+        const Eigen::Vector3d &p0 = vertices_[tria_p(0)];
+        const Eigen::Vector3d &p1 = vertices_[tria_p(1)];
+        const Eigen::Vector3d &p2 = vertices_[tria_p(2)];
+        for (size_t tidx1 = tidx0 + 1; tidx1 < triangles_.size(); ++tidx1) {
+            const Eigen::Vector3i &tria_q = triangles_[tidx1];
+            // check if neighbour triangle
+            if (tria_p(0) == tria_q(0) || tria_p(0) == tria_q(1) ||
+                tria_p(0) == tria_q(2) || tria_p(1) == tria_q(0) ||
+                tria_p(1) == tria_q(1) || tria_p(1) == tria_q(2) ||
+                tria_p(2) == tria_q(0) || tria_p(2) == tria_q(1) ||
+                tria_p(2) == tria_q(2)) {
+                continue;
+            }
 
-//             // check for intersection
-//             const Eigen::Vector3d &q0 = vertices_[tria_q(0)];
-//             const Eigen::Vector3d &q1 = vertices_[tria_q(1)];
-//             const Eigen::Vector3d &q2 = vertices_[tria_q(2)];
-//             if (IntersectionTest::TriangleTriangle3d(p0, p1, p2, q0, q1, q2)) {
-//                 self_intersecting_triangles.push_back(
-//                         Eigen::Vector2i(tidx0, tidx1));
-//             }
-//         }
-//     }
-//     return self_intersecting_triangles;
-// }
+            // check for intersection
+            const Eigen::Vector3d &q0 = vertices_[tria_q(0)];
+            const Eigen::Vector3d &q1 = vertices_[tria_q(1)];
+            const Eigen::Vector3d &q2 = vertices_[tria_q(2)];
+            if (IntersectionTest::TriangleTriangle3d(p0, p1, p2, q0, q1, q2)) {
+                self_intersecting_triangles.push_back(
+                        Eigen::Vector2i(tidx0, tidx1));
+            }
+        }
+    }
+    return self_intersecting_triangles;
+}
 
-// bool TriangleMesh::IsSelfIntersecting() const {
-//     return !GetSelfIntersectingTriangles().empty();
-// }
+bool TriangleMesh::IsSelfIntersecting() const {
+    return !GetSelfIntersectingTriangles().empty();
+}
 
-// bool TriangleMesh::IsBoundingBoxIntersecting(const TriangleMesh &other) const {
-//     return IntersectionTest::AABBAABB(GetMinBound(), GetMaxBound(),
-//                                       other.GetMinBound(), other.GetMaxBound());
-// }
+bool TriangleMesh::IsBoundingBoxIntersecting(const TriangleMesh &other) const {
+    return IntersectionTest::AABBAABB(GetMinBound(), GetMaxBound(),
+                                      other.GetMinBound(), other.GetMaxBound());
+}
 
-// bool TriangleMesh::IsIntersecting(const TriangleMesh &other) const {
-//     if (!IsBoundingBoxIntersecting(other)) {
-//         return false;
-//     }
-//     for (size_t tidx0 = 0; tidx0 < triangles_.size(); ++tidx0) {
-//         const Eigen::Vector3i &tria_p = triangles_[tidx0];
-//         const Eigen::Vector3d &p0 = vertices_[tria_p(0)];
-//         const Eigen::Vector3d &p1 = vertices_[tria_p(1)];
-//         const Eigen::Vector3d &p2 = vertices_[tria_p(2)];
-//         for (size_t tidx1 = 0; tidx1 < other.triangles_.size(); ++tidx1) {
-//             const Eigen::Vector3i &tria_q = other.triangles_[tidx1];
-//             const Eigen::Vector3d &q0 = other.vertices_[tria_q(0)];
-//             const Eigen::Vector3d &q1 = other.vertices_[tria_q(1)];
-//             const Eigen::Vector3d &q2 = other.vertices_[tria_q(2)];
-//             if (IntersectionTest::TriangleTriangle3d(p0, p1, p2, q0, q1, q2)) {
-//                 return true;
-//             }
-//         }
-//     }
-//     return false;
-// }
+bool TriangleMesh::IsIntersecting(const TriangleMesh &other) const {
+    if (!IsBoundingBoxIntersecting(other)) {
+        return false;
+    }
+    for (size_t tidx0 = 0; tidx0 < triangles_.size(); ++tidx0) {
+        const Eigen::Vector3i &tria_p = triangles_[tidx0];
+        const Eigen::Vector3d &p0 = vertices_[tria_p(0)];
+        const Eigen::Vector3d &p1 = vertices_[tria_p(1)];
+        const Eigen::Vector3d &p2 = vertices_[tria_p(2)];
+        for (size_t tidx1 = 0; tidx1 < other.triangles_.size(); ++tidx1) {
+            const Eigen::Vector3i &tria_q = other.triangles_[tidx1];
+            const Eigen::Vector3d &q0 = other.vertices_[tria_q(0)];
+            const Eigen::Vector3d &q1 = other.vertices_[tria_q(1)];
+            const Eigen::Vector3d &q2 = other.vertices_[tria_q(2)];
+            if (IntersectionTest::TriangleTriangle3d(p0, p1, p2, q0, q1, q2)) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
 
 std::shared_ptr<TriangleMesh> TriangleMesh::ComputeConvexHull() const {
     return Qhull::ComputeConvexHull(vertices_);

@@ -30,6 +30,6 @@ void NormalizeMeshDataBase(const std::vector<std::filesystem::path> &files)
 
 		Normalize(mesh);
 
-		open3d::io::WriteTriangleMesh(replaceDir(f, NORMALIZED_DIR), *mesh, true, true);
+		open3d::io::WriteTriangleMesh(replaceDir(f, NORMALIZED_DIR).string(), *mesh, true, true);
 	}
 }
