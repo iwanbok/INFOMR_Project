@@ -9,10 +9,10 @@
 std::vector<std::string> exts = {".off", ".ply", ".stl"};
 
 int lowerBoundF = 15000, targetF = 20000, upperBoundF = 25000;
+float avgV = 0, avgF = 0;
+int minV = INT_MAX, maxV = 0, minF = INT_MAX, maxF = 0, numMeshes = 0;
 void CalcMeshStatistics(const std::vector<std::filesystem::path> &files)
 {
-	float avgV = 0, avgF = 0;
-	int minV = INT_MAX, maxV = 0, minF = INT_MAX, maxF = 0, numMeshes = 0;
 
 	for (auto &f : files)
 		if (std::find(exts.begin(), exts.end(), f.extension().string()) != exts.end())

@@ -84,6 +84,8 @@ int main(int argc, char *argv[])
 			filesystem::create_directories(NORMALIZED_DIR);
 		NormalizeMeshDataBase(preprossed);
 	}
+	else
+		CalcMeshStatistics(getAllFilesInDir(NORMALIZED_DIR));
 
 	std::vector<Features> features;
 	if (options.find('f') == options.npos)
