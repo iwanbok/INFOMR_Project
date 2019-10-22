@@ -8,11 +8,15 @@
 #define FEATURE_DIR ASSET_PATH "features"
 #define INFO_DIR ASSET_PATH "info"
 
+#define DISPLAY_COUNT 10
+
 #include <igl/opengl/glfw/Viewer.h>
 #include <igl/opengl/glfw/imgui/ImGuiHelpers.h>
 #include <igl/opengl/glfw/imgui/ImGuiMenu.h>
 #include <igl/read_triangle_mesh.h>
 #include <imgui/imgui.h>
+#include <imgui/imgui_internal.h>
+#include <pfd/portable_file_dialogs.h>
 
 #include <algorithm>
 #include <filesystem>
@@ -24,13 +28,15 @@
 #include "Open3D/Geometry/TriangleMesh.h"
 #include "Open3D/IO/TriangleMeshIO.h"
 
+#include "Features.hpp"
 #include "Normalize.hpp"
 #include "PreProcess.hpp"
-#include "Features.hpp"
 
 using namespace Eigen;
 using namespace std;
 
+igl::opengl::glfw::Viewer viewer;
+FeatureDatabase fdb;
 MatrixXd V;
 MatrixXi F;
 
@@ -49,11 +55,42 @@ class CustomMenu : public igl::opengl::glfw::imgui::ImGuiMenu
 		// Add new group
 		if (ImGui::CollapsingHeader("Search Options", ImGuiTreeNodeFlags_DefaultOpen))
 		{
+			static std::shared_ptr<pfd::open_file> open_file;
+
+			ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)open_file);
+			if (ImGui::Button("Open File"))
+				open_file = std::make_shared<pfd::open_file>(
+					"Choose mesh", ASSET_PATH,
+					vector<string>({"3D Meshes (.off, .ply, .stl)", "*.off | *.ply | *.stl"}));
+			if (open_file && open_file->ready())
+			{
+				auto result = open_file->result();
+				if (result.size())
+				{
+					std::cout << "Opened file " << result[0] << "\n";
+					auto mesh = open3d::io::CreateMeshFromFile(result[0]);
+					PreProcess(mesh);
+					Normalize(mesh);
+					auto features = CalcFeatures(mesh);
+					fdb.NormalizeFeatures(features);
+					auto distances = fdb.CalcDistances(features);
+					sort(distances.begin(), distances.end());
+					double dist;
+					std::filesystem::path m;
+					for (size_t i = 0; i < DISPLAY_COUNT; i++)
+					{
+						std::tie(dist, m) = distances[i];
+						cout << dist << ": " << m << endl;
+					}
+				}
+				open_file = nullptr;
+			}
+			ImGui::PopItemFlag();
 		}
 	}
 } menu;
 
-bool key_down(igl::opengl::glfw::Viewer &viewer, unsigned char key, int modifier)
+bool key_down(igl::opengl::glfw::Viewer &view, unsigned char key, int modifier)
 {
 	return false;
 }
@@ -72,7 +109,7 @@ int main(int argc, char *argv[])
 	if (options.find('p') == options.npos)
 	{
 		vector<filesystem::path> originals = getAllFilesInDir(ORIGINAL_DIR);
-		if(!filesystem::exists(PREPROCESSED_DIR))
+		if (!filesystem::exists(PREPROCESSED_DIR))
 			filesystem::create_directories(PREPROCESSED_DIR);
 		PreProcessMeshDatabase(originals);
 	}
@@ -80,29 +117,23 @@ int main(int argc, char *argv[])
 	if (options.find('n') == options.npos)
 	{
 		vector<filesystem::path> preprossed = getAllFilesInDir(PREPROCESSED_DIR);
-		if(!filesystem::exists(NORMALIZED_DIR))
+		if (!filesystem::exists(NORMALIZED_DIR))
 			filesystem::create_directories(NORMALIZED_DIR);
 		NormalizeMeshDataBase(preprossed);
 	}
 	else
 		CalcMeshStatistics(getAllFilesInDir(NORMALIZED_DIR));
 
-	std::vector<Features> features;
 	if (options.find('f') == options.npos)
 	{
 		vector<filesystem::path> normalized = getAllFilesInDir(NORMALIZED_DIR);
-		if(!filesystem::exists(FEATURE_DIR))
+		if (!filesystem::exists(FEATURE_DIR))
 			filesystem::create_directories(FEATURE_DIR);
-		features = CalculateFeaturesMeshDatabase(normalized);
+		fdb = CalculateFeaturesMeshDatabase(normalized);
 	}
 	else
-	{
-		vector<filesystem::path> featurefiles = getAllFilesInDir(FEATURE_DIR);
-		features = ReadFeatureDatabase(featurefiles);
-	}
-	cout << features[0] << endl;
+		fdb = FeatureDatabase(FEATURE_DIR);
 
-	igl::opengl::glfw::Viewer viewer;
 	igl::readOFF(NORMALIZED_DIR "/Armadillo/281.off", V, F);
 
 	viewer.data().set_mesh(V, F);

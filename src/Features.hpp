@@ -30,14 +30,14 @@ class Histogram
 	}
 
 	/// Returns the normalized histogram
-	std::vector<float> Normalized()
+	std::vector<double> Normalized()
 	{
 		int total = std::accumulate(bins.begin(), bins.end(), 0);
 		if (!total)
-			return std::vector<float>(binCount);
-		std::vector<float> normalized(binCount);
+			return std::vector<double>(binCount);
+		std::vector<double> normalized(binCount);
 		std::transform(bins.begin(), bins.end(), normalized.begin(),
-					   std::bind(std::multiplies<float>(), std::placeholders::_1, 1.f / total));
+					   std::bind(std::multiplies<double>(), std::placeholders::_1, 1.0 / total));
 		return normalized;
 	}
 
@@ -73,7 +73,7 @@ struct Features
 	// D3 max sqrt(sqrt(3) / 2) => 0.93 => +- 1
 	// D4 max at most 1/2 because longest edge is sqrt(3) largest base is sqrt(3) / 2 => 1/3 *
 	// sqrt(3) / 2 * sqrt(3) = 1/2 => cuberoot(1/2) = 0.79 => +- 0.8
-	std::vector<float> A3, D1, D2, D3, D4;
+	std::vector<double> A3, D1, D2, D3, D4;
 
 	Features() : A3(A3_size), D1(D1_size), D2(D2_size), D3(D3_size), D4(D4_size)
 	{
@@ -93,6 +93,47 @@ struct Features
 			in >> D3[i];
 		for (size_t i = 0; i < D4_size; i++)
 			in >> D4[i];
+	}
+
+	double Distance(const Features &other)
+	{
+		double result = 0;
+		double diff = other.surface_area - surface_area;
+		result += diff * diff;
+		diff = other.compactness - compactness;
+		result += diff * diff;
+		diff = other.aabbV - aabbV;
+		result += diff * diff;
+		diff = other.diameter - diameter;
+		result += diff * diff;
+		diff = other.eccentricity - eccentricity;
+		result += diff * diff;
+		for (size_t i = 0; i < A3_size; i++)
+		{
+			diff = other.A3[i] - A3[i];
+			result += diff * diff;
+		}
+		for (size_t i = 0; i < D1_size; i++)
+		{
+			diff = other.D1[i] - D1[i];
+			result += diff * diff;
+		}
+		for (size_t i = 0; i < D2_size; i++)
+		{
+			diff = other.D2[i] - D2[i];
+			result += diff * diff;
+		}
+		for (size_t i = 0; i < D3_size; i++)
+		{
+			diff = other.D3[i] - D3[i];
+			result += diff * diff;
+		}
+		for (size_t i = 0; i < D4_size; i++)
+		{
+			diff = other.D4[i] - D4[i];
+			result += diff * diff;
+		}
+		return std::sqrt(result);
 	}
 };
 
@@ -224,25 +265,130 @@ Features CalcFeatures(const std::shared_ptr<open3d::geometry::TriangleMesh> &mes
 	return features;
 }
 
-std::vector<Features> ReadFeatureDatabase(const std::vector<std::filesystem::path> &files)
+// Struct containing normalized feature vectors
+struct FeatureDatabase
 {
-	std::vector<Features> features(files.size());
-	for (size_t i = 0; i < files.size(); i++)
-		features[i].ReadFromFile(files[i]);
-	return features;
-}
+	std::vector<Features> features;
+	std::vector<std::filesystem::path> meshes;
+	double surface_area_avg, compactness_avg, aabbV_avg, diameter_avg, eccentricity_avg;
+	double surface_area_stddev, compactness_stddev, aabbV_stddev, diameter_stddev,
+		eccentricity_stddev;
 
-std::vector<Features> CalculateFeaturesMeshDatabase(const std::vector<std::filesystem::path> &files)
+	FeatureDatabase()
+	{
+	}
+
+	FeatureDatabase(const std::string &db_dir)
+	{
+		auto files = getAllFilesInDir(db_dir);
+		std::sort(files.begin(), files.end());
+		std::ifstream in(files[files.size() - 1]);
+		in >> surface_area_avg >> surface_area_stddev >> compactness_stddev >> compactness_avg >>
+			aabbV_avg >> aabbV_stddev >> diameter_avg >> diameter_stddev >> eccentricity_avg >>
+			eccentricity_stddev;
+		in.close();
+		features = std::vector<Features>(files.size() - 1);
+		for (size_t i = 0; i < files.size() - 1; i++)
+			features[i].ReadFromFile(files[i]);
+		meshes = std::vector<std::filesystem::path>(files.size() - 1);
+		for (size_t i = 0; i < files.size() - 1; i++)
+			meshes[i] = replaceDir(files[i], ORIGINAL_DIR).replace_extension(".off");
+	}
+
+	FeatureDatabase(const std::vector<Features> &not_normal, const std::vector<std::filesystem::path> &meshes) : features(not_normal), meshes(meshes)
+	{
+		int n = not_normal.size();
+		// Compute Averages
+		for (const auto &f : not_normal)
+		{
+			surface_area_avg += f.surface_area / n;
+			compactness_avg += f.compactness / n;
+			aabbV_avg += f.aabbV / n;
+			diameter_avg += f.diameter / n;
+			eccentricity_avg += f.eccentricity / n;
+		}
+
+		// Compute standard deviations
+		// First accumulate squared mean distance
+		for (const auto &f : not_normal)
+		{
+			double diff = f.surface_area - surface_area_avg;
+			surface_area_stddev += diff * diff;
+			diff = f.compactness - compactness_avg;
+			compactness_stddev += diff * diff;
+			diff = f.aabbV - aabbV_avg;
+			aabbV_stddev += diff * diff;
+			diff = f.diameter - diameter_avg;
+			diameter_stddev += diff * diff;
+			diff = f.eccentricity - eccentricity_avg;
+			eccentricity_stddev += diff * diff;
+		}
+		// Secondly compute actual standard deviation
+		surface_area_stddev = std::sqrt(surface_area_stddev / (n - 1));
+		compactness_stddev = std::sqrt(compactness_stddev / (n - 1));
+		aabbV_stddev = std::sqrt(aabbV_stddev / (n - 1));
+		diameter_stddev = std::sqrt(diameter_stddev / (n - 1));
+		eccentricity_stddev = std::sqrt(eccentricity_stddev / (n - 1));
+
+		// Normalize Features
+		for (auto &f : features)
+			NormalizeFeatures(f);
+	}
+
+	void NormalizeFeatures(Features &f)
+	{
+		f.surface_area = (f.surface_area - surface_area_avg) / surface_area_stddev;
+		f.compactness = (f.compactness - compactness_avg) / compactness_stddev;
+		f.aabbV = (f.aabbV - aabbV_avg) / aabbV_stddev;
+		f.diameter = (f.diameter - diameter_avg) / diameter_stddev;
+		f.eccentricity = (f.eccentricity - eccentricity_avg) / eccentricity_stddev;
+	}
+
+	void WriteDatabaseInfo(const std::filesystem::path &path)
+	{
+		std::ofstream out(path);
+		out << surface_area_avg << std::endl
+			<< surface_area_stddev << std::endl
+			<< compactness_stddev << std::endl
+			<< compactness_avg << std::endl
+			<< aabbV_avg << std::endl
+			<< aabbV_stddev << std::endl
+			<< diameter_avg << std::endl
+			<< diameter_stddev << std::endl
+			<< eccentricity_avg << std::endl
+			<< eccentricity_stddev << std::endl;
+		out.close();
+	}
+
+	std::vector<std::tuple<double, std::filesystem::path>> CalcDistances(const Features &f)
+	{	
+		std::vector<std::tuple<double, std::filesystem::path>> distances(features.size());
+		for (size_t i = 0; i < features.size(); i++)
+			distances[i] = std::make_tuple(features[i].Distance(f), meshes[i]);
+		return distances;
+	}
+};
+
+FeatureDatabase CalculateFeaturesMeshDatabase(const std::vector<std::filesystem::path> &files)
 {
 	std::vector<Features> features(files.size());
 	for (size_t i = 0; i < files.size(); i++)
 	{
 		auto mesh = open3d::io::CreateMeshFromFile(files[i].string());
 		features[i] = CalcFeatures(mesh);
+	}
+	std::vector<std::filesystem::path> originals(files.size());
+	for (size_t i = 0; i < files.size(); i++)
+		originals[i] = replaceDir(files[i], ORIGINAL_DIR);
+	
+	FeatureDatabase fdb(features, originals);
 
+	fdb.WriteDatabaseInfo(FEATURE_DIR "/db_info.fdb");
+	for (size_t i = 0; i < files.size(); i++)
+	{
 		std::ofstream out(replaceDir(files[i], FEATURE_DIR).replace_extension(".features"));
-		out << features[i];
+		out << fdb.features[i];
 		out.close();
 	}
-	return features;
+	return fdb;
 }
