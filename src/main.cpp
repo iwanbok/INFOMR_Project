@@ -35,7 +35,6 @@
 using namespace Eigen;
 using namespace std;
 
-igl::opengl::glfw::Viewer viewer;
 FeatureDatabase fdb;
 MatrixXd V;
 MatrixXi F;
@@ -73,6 +72,11 @@ class CustomMenu : public igl::opengl::glfw::imgui::ImGuiMenu
 					Normalize(mesh);
 					auto features = CalcFeatures(mesh);
 					fdb.NormalizeFeatures(features);
+
+					igl::readOFF(result[0], V, F);
+					viewer->data().clear();
+					viewer->data().set_mesh(V, F);
+
 					auto distances = fdb.CalcDistances(features);
 					sort(distances.begin(), distances.end());
 					double dist;
@@ -121,11 +125,11 @@ int main(int argc, char *argv[])
 			filesystem::create_directories(NORMALIZED_DIR);
 		NormalizeMeshDataBase(preprossed);
 	}
-	else
-		CalcMeshStatistics(getAllFilesInDir(NORMALIZED_DIR));
 
 	if (options.find('f') == options.npos)
 	{
+		if (options.find('n') != options.npos)
+			CalcMeshStatistics(getAllFilesInDir(NORMALIZED_DIR));
 		vector<filesystem::path> normalized = getAllFilesInDir(NORMALIZED_DIR);
 		if (!filesystem::exists(FEATURE_DIR))
 			filesystem::create_directories(FEATURE_DIR);
@@ -136,6 +140,7 @@ int main(int argc, char *argv[])
 
 	igl::readOFF(NORMALIZED_DIR "/Armadillo/281.off", V, F);
 
+	igl::opengl::glfw::Viewer viewer;
 	viewer.data().set_mesh(V, F);
 
 	viewer.callback_key_down = &key_down;

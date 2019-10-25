@@ -41,6 +41,10 @@ void CalcMeshStatistics(const std::vector<std::filesystem::path> &files)
 		   avgV, minV, maxV, avgF, minF, maxF);
 }
 
+template <typename T> int sgn(T val) {
+    return (T(0) < val) - (val < T(0));
+}
+
 std::string GetCmdOptions(int argc, char **argv)
 {
 	std::string result;

@@ -70,9 +70,9 @@ struct Features
 	// A3 max pi => 3.14
 	// D1 max sqrt(3)
 	// D2 max sqrt(3) => 1.73 => +- 1.8
-	// D3 max sqrt(sqrt(3) / 2) => 0.93 => +- 1
+	// D3 max sqrt(sqrt(3) / 2) => 0.93 => +- 0.8
 	// D4 max at most 1/2 because longest edge is sqrt(3) largest base is sqrt(3) / 2 => 1/3 *
-	// sqrt(3) / 2 * sqrt(3) = 1/2 => cuberoot(1/2) = 0.79 => +- 0.8
+	// sqrt(3) / 2 * sqrt(3) = 1/2 => cuberoot(1/2) = 0.79 => +- 0.6
 	std::vector<double> A3, D1, D2, D3, D4;
 
 	Features() : A3(A3_size), D1(D1_size), D2(D2_size), D3(D3_size), D4(D4_size)
@@ -97,6 +97,7 @@ struct Features
 
 	double Distance(const Features &other)
 	{
+#if 1
 		double result = 0;
 		double diff = other.surface_area - surface_area;
 		result += diff * diff;
@@ -134,6 +135,59 @@ struct Features
 			result += diff * diff;
 		}
 		return std::sqrt(result);
+#else
+
+		double A3_dist, D1_dist, D2_dist, D3_dist, D4_dist;
+		double p = 2;
+		const double sigma = 0.84089642;
+		const double twosigma2 = 2 * sigma * sigma;
+		const double constfactor = 1.0 / std::sqrt(2 * M_PI * sigma * sigma);
+		size_t minmax = 5;
+
+		for (size_t i = 0; i < A3_size; i++)
+			for (size_t j = -minmax; j <= minmax; j++)
+				if (i + j > 0 && i + j < A3_size)
+					A3_dist += constfactor * std::exp(-j * j / twosigma2) *
+							   std::pow(std::abs(A3[i] - other.A3[i + j]), p);
+		A3_dist = std::pow(A3_dist, 1 / p);
+
+		for (size_t i = 0; i < D1_size; i++)
+			for (size_t j = -minmax; j <= minmax; j++)
+				if (i + j > 0 && i + j < D1_size)
+					D1_dist += constfactor * std::exp(-j * j / twosigma2) *
+							   std::pow(std::abs(D1[i] - other.D1[i + j]), p);
+		D1_dist = std::pow(D1_dist, 1 / p);
+
+		for (size_t i = 0; i < D2_size; i++)
+			for (size_t j = -minmax; j <= minmax; j++)
+				if (i + j > 0 && i + j < D2_size)
+					D2_dist += constfactor * std::exp(-j * j / twosigma2) *
+							   std::pow(std::abs(D2[i] - other.D2[i + j]), p);
+		D2_dist = std::pow(D2_dist, 1 / p);
+
+		for (size_t i = 0; i < D3_size; i++)
+			for (size_t j = -minmax; j <= minmax; j++)
+				if (i + j > 0 && i + j < D3_size)
+					D3_dist += constfactor * std::exp(-j * j / twosigma2) *
+							   std::pow(std::abs(D3[i] - other.D3[i + j]), p);
+		D3_dist = std::pow(D3_dist, 1 / p);
+
+		for (size_t i = 0; i < D4_size; i++)
+			for (size_t j = -minmax; j <= minmax; j++)
+				if (i + j > 0 && i + j < D4_size)
+					D4_dist += constfactor * std::exp(-j * j / twosigma2) *
+							   std::pow(std::abs(D4[i] - other.D4[i + j]), p);
+		D4_dist = std::pow(D4_dist, 1 / p);
+
+		Eigen::VectorXd feature_1(5), feature_2(5);
+		Eigen::MatrixXd W = Eigen::MatrixXd::Identity(5, 5);
+		feature_1 << surface_area, compactness, aabbV, diameter, eccentricity;
+		feature_2 << other.surface_area, other.compactness, other.aabbV, other.diameter,
+			other.eccentricity;
+
+		return (feature_1 - feature_2).transpose() * W * (feature_1 - feature_2) + A3_dist +
+			   D1_dist + D2_dist + D3_dist + D4_dist;
+#endif
 	}
 };
 
@@ -232,7 +286,7 @@ Features CalcFeatures(const std::shared_ptr<open3d::geometry::TriangleMesh> &mes
 	D2_hist.AddToHistogram(D2_vals);
 	features.D2 = D2_hist.Normalized();
 
-	Histogram<double> D3_hist(0, 1, features.D3_size);
+	Histogram<double> D3_hist(0, 0.8, features.D3_size);
 	std::shuffle(mesh->triangles_.begin(), mesh->triangles_.end(),
 				 std::default_random_engine(std::time(0)));
 	auto D3_sample = mesh->SamplePointsUniformly(avgV * 3);
@@ -246,7 +300,7 @@ Features CalcFeatures(const std::shared_ptr<open3d::geometry::TriangleMesh> &mes
 	D3_hist.AddToHistogram(D3_vals);
 	features.D3 = D3_hist.Normalized();
 
-	Histogram<double> D4_hist(0, 1, features.D4_size);
+	Histogram<double> D4_hist(0, 0.6, features.D4_size);
 	std::shuffle(mesh->triangles_.begin(), mesh->triangles_.end(),
 				 std::default_random_engine(std::time(0)));
 	auto D4_sample = mesh->SamplePointsUniformly(avgV * 4);
@@ -257,7 +311,7 @@ Features CalcFeatures(const std::shared_ptr<open3d::geometry::TriangleMesh> &mes
 		auto v_ab = D4_sample->points_[i + 1] - D4_sample->points_[i];
 		auto v_ac = D4_sample->points_[i + 2] - D4_sample->points_[i];
 		auto v_ad = D4_sample->points_[i + 3] - D4_sample->points_[i];
-		D4_vals[i / 4] = std::cbrt((1.0 / 6.0) * v_ab.cross(v_ac).dot(v_ad));
+		D4_vals[i / 4] = std::cbrt((1.0 / 6.0) * std::abs(v_ab.cross(v_ac).dot(v_ad)));
 	}
 	D4_hist.AddToHistogram(D4_vals);
 	features.D4 = D4_hist.Normalized();
@@ -285,7 +339,8 @@ struct FeatureDatabase
 		std::ifstream in(files[files.size() - 1]);
 		in >> surface_area_avg >> surface_area_stddev >> compactness_stddev >> compactness_avg >>
 			aabbV_avg >> aabbV_stddev >> diameter_avg >> diameter_stddev >> eccentricity_avg >>
-			eccentricity_stddev;
+			eccentricity_stddev >> lowerBoundF >> targetF >> upperBoundF >> avgV >> avgF >> minV >>
+			maxV >> minF >> maxF >> numMeshes;
 		in.close();
 		features = std::vector<Features>(files.size() - 1);
 		for (size_t i = 0; i < files.size() - 1; i++)
@@ -295,7 +350,9 @@ struct FeatureDatabase
 			meshes[i] = replaceDir(files[i], ORIGINAL_DIR).replace_extension(".off");
 	}
 
-	FeatureDatabase(const std::vector<Features> &not_normal, const std::vector<std::filesystem::path> &meshes) : features(not_normal), meshes(meshes)
+	FeatureDatabase(const std::vector<Features> &not_normal,
+					const std::vector<std::filesystem::path> &meshes)
+		: features(not_normal), meshes(meshes)
 	{
 		int n = not_normal.size();
 		// Compute Averages
@@ -356,12 +413,22 @@ struct FeatureDatabase
 			<< diameter_avg << std::endl
 			<< diameter_stddev << std::endl
 			<< eccentricity_avg << std::endl
-			<< eccentricity_stddev << std::endl;
+			<< eccentricity_stddev << std::endl
+			<< lowerBoundF << std::endl
+			<< targetF << std::endl
+			<< upperBoundF << std::endl
+			<< avgV << std::endl
+			<< avgF << std::endl
+			<< minV << std::endl
+			<< maxV << std::endl
+			<< minF << std::endl
+			<< maxF << std::endl
+			<< numMeshes << std::endl;
 		out.close();
 	}
 
 	std::vector<std::tuple<double, std::filesystem::path>> CalcDistances(const Features &f)
-	{	
+	{
 		std::vector<std::tuple<double, std::filesystem::path>> distances(features.size());
 		for (size_t i = 0; i < features.size(); i++)
 			distances[i] = std::make_tuple(features[i].Distance(f), meshes[i]);
@@ -380,7 +447,7 @@ FeatureDatabase CalculateFeaturesMeshDatabase(const std::vector<std::filesystem:
 	std::vector<std::filesystem::path> originals(files.size());
 	for (size_t i = 0; i < files.size(); i++)
 		originals[i] = replaceDir(files[i], ORIGINAL_DIR);
-	
+
 	FeatureDatabase fdb(features, originals);
 
 	fdb.WriteDatabaseInfo(FEATURE_DIR "/db_info.fdb");
