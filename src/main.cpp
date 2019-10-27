@@ -8,7 +8,7 @@
 #define FEATURE_DIR ASSET_PATH "features"
 #define INFO_DIR ASSET_PATH "info"
 
-#define THRESHOLD 1
+#define THRESHOLD 0.9
 
 #include <igl/opengl/glfw/Viewer.h>
 #include <igl/opengl/glfw/imgui/ImGuiHelpers.h>
@@ -44,11 +44,13 @@ class CustomMenu : public igl::opengl::glfw::imgui::ImGuiMenu
 {
 	map<string, int> ccs;
 	vector<string> classes;
+	int total_meshes;
 
   public:
 	CustomMenu()
 	{
 		std::vector<std::filesystem::path> files = getAllFilesInDir(PREPROCESSED_DIR);
+		total_meshes = files.size();
 		std::sort(files.begin(), files.end());
 		for (auto &f : files)
 		{
@@ -125,17 +127,40 @@ class CustomMenu : public igl::opengl::glfw::imgui::ImGuiMenu
 
 					auto distances = fdb.CalcDistances(features);
 					sort(distances.begin(), distances.end());
+					int TP = 0, FP = 0;
 					for (const auto &d : distances)
 					{
 						double dist;
 						std::filesystem::path m;
 						std::tie(dist, m) = d;
-						auto p = m.parent_path();
-						auto m_class = p.string().substr(p.parent_path().string().size() + 1);
 						if (dist > THRESHOLD)
 							break;
+						auto p = m.parent_path();
+						auto m_class = p.string().substr(p.parent_path().string().size() + 1);
+						if (strcmp(curr_class, m_class.c_str()))
+							FP++;
+						else
+							TP++;
 						cout << dist << ": " << m << endl;
 					}
+					int P = ccs[string(curr_class)];
+					int N = total_meshes - P;
+					int TN = N - FP;
+					int FN = P - TP;
+
+					cout << "Class: " << curr_class << endl
+						 << "Class size: " << P << endl
+						 << "TP: " << TP << endl
+						 << "FP: " << FP << endl
+						 << "TN: " << TN << endl
+						 << "FN: " << FN << endl
+						 << "Recall: " << double(TP) / P << endl
+						 << "Selectivity: " << double(TN) / N << endl
+						 << "Precision: " << TP / double(TP + FP) << endl
+						 << "NPV: " << TN / double(TN + FN) << endl
+						 << "Threat Score: " << TP / double(TP + FN + FP) << endl
+						 << "Accuracy: " << double(TP + TN) / total_meshes << endl
+						 << "F1 Score: " << double(2 * TP) / double(2 * TP + FP + FN) << endl;
 					filename = NULL;
 					curr_class = NULL;
 				}
