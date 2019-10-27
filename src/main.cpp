@@ -8,7 +8,7 @@
 #define FEATURE_DIR ASSET_PATH "features"
 #define INFO_DIR ASSET_PATH "info"
 
-#define DISPLAY_COUNT 10
+#define THRESHOLD 1
 
 #include <igl/opengl/glfw/Viewer.h>
 #include <igl/opengl/glfw/imgui/ImGuiHelpers.h>
@@ -79,11 +79,15 @@ class CustomMenu : public igl::opengl::glfw::imgui::ImGuiMenu
 
 					auto distances = fdb.CalcDistances(features);
 					sort(distances.begin(), distances.end());
-					double dist;
-					std::filesystem::path m;
-					for (size_t i = 0; i < DISPLAY_COUNT; i++)
+					for (const auto &d : distances)
 					{
-						std::tie(dist, m) = distances[i];
+						double dist;
+						std::filesystem::path m;
+						std::tie(dist, m) = d;
+						auto p = m.parent_path();
+						auto m_class = p.string().substr(p.parent_path().string().size() + 1);
+						if (dist > THRESHOLD)
+							break;
 						cout << dist << ": " << m << endl;
 					}
 				}
