@@ -22,6 +22,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -41,9 +42,22 @@ MatrixXi F;
 
 class CustomMenu : public igl::opengl::glfw::imgui::ImGuiMenu
 {
+	map<string, int> ccs;
+	vector<string> classes;
+
   public:
 	CustomMenu()
 	{
+		std::vector<std::filesystem::path> files = getAllFilesInDir(PREPROCESSED_DIR);
+		std::sort(files.begin(), files.end());
+		for (auto &f : files)
+		{
+			auto parent = f.parent_path();
+			auto mesh_class = parent.string().substr(parent.parent_path().string().size() + 1);
+			ccs[mesh_class]++;
+		}
+		for (map<string, int>::iterator it = ccs.begin(); it != ccs.end(); ++it)
+			classes.push_back(it->first);
 	}
 
 	virtual void draw_viewer_menu() override
@@ -54,7 +68,28 @@ class CustomMenu : public igl::opengl::glfw::imgui::ImGuiMenu
 		// Add new group
 		if (ImGui::CollapsingHeader("Search Options", ImGuiTreeNodeFlags_DefaultOpen))
 		{
-			static std::shared_ptr<pfd::open_file> open_file;
+			static shared_ptr<pfd::open_file> open_file;
+			static const char *filename = NULL;
+			static const char *curr_class = NULL;
+
+			if (ImGui::BeginCombo("##combo", curr_class)) // The second parameter is the label
+														  // previewed before opening the combo.
+			{
+				for (int n = 0; n < classes.size(); n++)
+				{
+					bool is_selected =
+						(curr_class ==
+						 classes[n].c_str()); // You can store your selection however you
+											  // want, outside or inside your objects
+					if (ImGui::Selectable(classes[n].c_str(), is_selected))
+						curr_class = classes[n].c_str();
+					if (is_selected)
+						ImGui::SetItemDefaultFocus(); // You may set the initial focus when opening
+													  // the combo (scrolling + for keyboard
+													  // navigation support)
+				}
+				ImGui::EndCombo();
+			}
 
 			ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)open_file);
 			if (ImGui::Button("Open File"))
@@ -66,16 +101,27 @@ class CustomMenu : public igl::opengl::glfw::imgui::ImGuiMenu
 				auto result = open_file->result();
 				if (result.size())
 				{
-					std::cout << "Opened file " << result[0] << "\n";
-					auto mesh = open3d::io::CreateMeshFromFile(result[0]);
+					filename = result[0].c_str();
+
+					igl::readOFF(filename, V, F);
+					viewer->data().clear();
+					viewer->data().set_mesh(V, F);
+				}
+				open_file = nullptr;
+			}
+			ImGui::PopItemFlag();
+
+			if (filename)
+			{
+				ImGui::Text(filesystem::path(filename).filename().string().c_str());
+				if (curr_class && ImGui::Button("Search"))
+				{
+					std::cout << "Opened file " << filename << "\n";
+					auto mesh = open3d::io::CreateMeshFromFile(filename);
 					PreProcess(mesh);
 					Normalize(mesh);
 					auto features = CalcFeatures(mesh);
 					fdb.NormalizeFeatures(features);
-
-					igl::readOFF(result[0], V, F);
-					viewer->data().clear();
-					viewer->data().set_mesh(V, F);
 
 					auto distances = fdb.CalcDistances(features);
 					sort(distances.begin(), distances.end());
@@ -90,10 +136,10 @@ class CustomMenu : public igl::opengl::glfw::imgui::ImGuiMenu
 							break;
 						cout << dist << ": " << m << endl;
 					}
+					filename = NULL;
+					curr_class = NULL;
 				}
-				open_file = nullptr;
 			}
-			ImGui::PopItemFlag();
 		}
 	}
 } menu;
