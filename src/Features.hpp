@@ -97,7 +97,7 @@ struct Features
 
 	double Distance(const Features &other)
 	{
-#if 1
+#if 0
 		double result = 0;
 		double diff = other.surface_area - surface_area;
 		result += diff * diff;
@@ -138,7 +138,7 @@ struct Features
 #else
 
 		double A3_dist, D1_dist, D2_dist, D3_dist, D4_dist;
-		double p = 2;
+		const double p = 2;
 		const double sigma = 0.84089642;
 		const double twosigma2 = 2 * sigma * sigma;
 		const double constfactor = 1.0 / std::sqrt(2 * M_PI * sigma * sigma);
@@ -399,6 +399,16 @@ struct FeatureDatabase
 		f.aabbV = (f.aabbV - aabbV_avg) / aabbV_stddev;
 		f.diameter = (f.diameter - diameter_avg) / diameter_stddev;
 		f.eccentricity = (f.eccentricity - eccentricity_avg) / eccentricity_stddev;
+		for (auto &b : f.A3)
+			b /= f.A3_size;
+		for (auto &b : f.D1)
+			b /= f.D1_size;
+		for (auto &b : f.D2)
+			b /= f.D2_size;
+		for (auto &b : f.D3)
+			b /= f.D3_size;
+		for (auto &b : f.D4)
+			b /= f.D4_size;		
 	}
 
 	void WriteDatabaseInfo(const std::filesystem::path &path)

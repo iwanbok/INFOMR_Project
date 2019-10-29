@@ -8,7 +8,7 @@
 #define FEATURE_DIR ASSET_PATH "features"
 #define INFO_DIR ASSET_PATH "info"
 
-#define THRESHOLD 0.9
+#define THRESHOLD 1
 
 #include <igl/opengl/glfw/Viewer.h>
 #include <igl/opengl/glfw/imgui/ImGuiHelpers.h>
@@ -39,12 +39,12 @@ using namespace std;
 FeatureDatabase fdb;
 MatrixXd V;
 MatrixXi F;
+vector<string> classes;
+map<string, int> ccs;
+int total_meshes;
 
 class CustomMenu : public igl::opengl::glfw::imgui::ImGuiMenu
 {
-	map<string, int> ccs;
-	vector<string> classes;
-	int total_meshes;
 
   public:
 	CustomMenu()
@@ -71,7 +71,7 @@ class CustomMenu : public igl::opengl::glfw::imgui::ImGuiMenu
 		if (ImGui::CollapsingHeader("Search Options", ImGuiTreeNodeFlags_DefaultOpen))
 		{
 			static shared_ptr<pfd::open_file> open_file;
-			static const char *filename = NULL;
+			static string filename = "";
 			static const char *curr_class = NULL;
 
 			if (ImGui::BeginCombo("##combo", curr_class)) // The second parameter is the label
@@ -103,7 +103,7 @@ class CustomMenu : public igl::opengl::glfw::imgui::ImGuiMenu
 				auto result = open_file->result();
 				if (result.size())
 				{
-					filename = result[0].c_str();
+					filename = result[0];
 
 					igl::readOFF(filename, V, F);
 					viewer->data().clear();
@@ -113,7 +113,7 @@ class CustomMenu : public igl::opengl::glfw::imgui::ImGuiMenu
 			}
 			ImGui::PopItemFlag();
 
-			if (filename)
+			if (filename.size())
 			{
 				ImGui::Text(filesystem::path(filename).filename().string().c_str());
 				if (curr_class && ImGui::Button("Search"))
@@ -161,7 +161,7 @@ class CustomMenu : public igl::opengl::glfw::imgui::ImGuiMenu
 						 << "Threat Score: " << TP / double(TP + FN + FP) << endl
 						 << "Accuracy: " << double(TP + TN) / total_meshes << endl
 						 << "F1 Score: " << double(2 * TP) / double(2 * TP + FP + FN) << endl;
-					filename = NULL;
+					filename = "";
 					curr_class = NULL;
 				}
 			}
@@ -212,6 +212,44 @@ int main(int argc, char *argv[])
 	}
 	else
 		fdb = FeatureDatabase(FEATURE_DIR);
+
+	if (options.find('d') == options.npos)
+	{
+		ofstream out(ASSET_PATH "/distances.txt");
+		double recall = 0, precision = 0;
+		for (size_t i = 0; i < fdb.features.size(); i++)
+		{
+			auto parent = fdb.meshes[i].parent_path();
+			auto curr_class =
+				parent.string().substr(parent.parent_path().string().size() + 1);
+			auto dists = fdb.CalcDistances(fdb.features[i]);
+			int FP = 0, TP = 0;
+			for (const auto &d : dists)
+			{
+				double dist;
+				filesystem::path m;
+				tie(dist, m) = d;
+				out << dist << " ";
+				if (dist <= THRESHOLD)
+				{
+					auto p = m.parent_path();
+					auto m_class = p.string().substr(p.parent_path().string().size() + 1);
+					if (curr_class.compare(m_class))
+						FP++;
+					else
+						TP++;
+				}
+			}
+			int P = ccs[curr_class];
+			recall += double(TP) / P;
+			precision += TP / double(TP + FP);
+		}
+		recall /= fdb.features.size();
+		precision /= fdb.features.size();
+		cout << "Recall over entire database: " << recall << endl
+			 << "Precision over entire database: " << precision << endl;
+		out.close();
+	}
 
 	igl::readOFF(NORMALIZED_DIR "/Armadillo/281.off", V, F);
 
