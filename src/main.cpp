@@ -43,6 +43,8 @@ vector<string> classes;
 map<string, int> ccs;
 int total_meshes;
 
+MatrixXd distances;
+
 class CustomMenu : public igl::opengl::glfw::imgui::ImGuiMenu
 {
 
@@ -125,10 +127,10 @@ class CustomMenu : public igl::opengl::glfw::imgui::ImGuiMenu
 					auto features = CalcFeatures(mesh);
 					fdb.NormalizeFeatures(features);
 
-					auto distances = fdb.CalcDistances(features);
-					sort(distances.begin(), distances.end());
+					auto dists = fdb.CalcDistances(features);
+					sort(dists.begin(), dists.end());
 					int TP = 0, FP = 0;
-					for (const auto &d : distances)
+					for (const auto &d : dists)
 					{
 						double dist;
 						std::filesystem::path m;
@@ -213,43 +215,58 @@ int main(int argc, char *argv[])
 	else
 		fdb = FeatureDatabase(FEATURE_DIR);
 
+	distances = MatrixXd::Zero(total_meshes, total_meshes);
 	if (options.find('d') == options.npos)
 	{
 		ofstream out(ASSET_PATH "/distances.txt");
-		double recall = 0, precision = 0;
-		for (size_t i = 0; i < fdb.features.size(); i++)
+		for (size_t i = 0; i < total_meshes; i++)
 		{
-			auto parent = fdb.meshes[i].parent_path();
-			auto curr_class =
-				parent.string().substr(parent.parent_path().string().size() + 1);
 			auto dists = fdb.CalcDistances(fdb.features[i]);
-			int FP = 0, TP = 0;
-			for (const auto &d : dists)
+			for (size_t j = 0; j < total_meshes; j++)
 			{
 				double dist;
 				filesystem::path m;
-				tie(dist, m) = d;
+				tie(dist, m) = dists[j];
 				out << dist << " ";
-				if (dist <= THRESHOLD)
-				{
-					auto p = m.parent_path();
-					auto m_class = p.string().substr(p.parent_path().string().size() + 1);
-					if (curr_class.compare(m_class))
-						FP++;
-					else
-						TP++;
-				}
+				distances(i, j) = dist;
 			}
-			int P = ccs[curr_class];
-			recall += double(TP) / P;
-			precision += TP / double(TP + FP);
+			out << endl;
 		}
-		recall /= fdb.features.size();
-		precision /= fdb.features.size();
-		cout << "Recall over entire database: " << recall << endl
-			 << "Precision over entire database: " << precision << endl;
 		out.close();
 	}
+	else
+	{
+		ifstream dist_file(ASSET_PATH "/distances.txt");
+		for (size_t i = 0; i < total_meshes; i++)
+			for (size_t j = 0; j < total_meshes; j++)
+				dist_file >> distances(i, j);
+		dist_file.close();
+	}
+
+	double recall = 0, precision = 0;
+	for (size_t i = 0; i < total_meshes; i++)
+	{
+		auto parent = fdb.meshes[i].parent_path();
+		auto curr_class = parent.string().substr(parent.parent_path().string().size() + 1);
+		int FP = 0, TP = 0;
+		for (size_t j = 0; j < total_meshes; j++)
+			if (distances(i, j) <= THRESHOLD)
+			{
+				auto p = fdb.meshes[j].parent_path();
+				auto m_class = p.string().substr(p.parent_path().string().size() + 1);
+				if (curr_class.compare(m_class))
+					FP++;
+				else
+					TP++;
+			}
+		int P = ccs[curr_class];
+		recall += double(TP) / P;
+		precision += TP / double(TP + FP);
+	}
+	recall /= fdb.features.size();
+	precision /= fdb.features.size();
+	cout << "Recall over entire database: " << recall << endl
+		 << "Precision over entire database: " << precision << endl;
 
 	igl::readOFF(NORMALIZED_DIR "/Armadillo/281.off", V, F);
 

@@ -148,5 +148,6 @@ std::vector<std::filesystem::path> getAllFilesInDir(const std::string &dirPath,
 	{
 		std::cerr << "Exception :: " << e.what();
 	}
+	sort(listOfFiles.begin(), listOfFiles.end());
 	return listOfFiles;
 }
