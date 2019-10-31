@@ -138,7 +138,6 @@ struct Features
 #else
 
 		double A3_dist, D1_dist, D2_dist, D3_dist, D4_dist;
-		const double p = 2;
 		const double sigma = 0.84089642;
 		const double twosigma2 = 2 * sigma * sigma;
 		const double constfactor = 1.0 / std::sqrt(2 * M_PI * sigma * sigma);
@@ -147,37 +146,47 @@ struct Features
 		for (size_t i = 0; i < A3_size; i++)
 			for (size_t j = -minmax; j <= minmax; j++)
 				if (i + j > 0 && i + j < A3_size)
-					A3_dist += constfactor * std::exp(-j * j / twosigma2) *
-							   std::pow(std::abs(A3[i] - other.A3[i + j]), p);
-		A3_dist = std::pow(A3_dist, 1 / p);
+				{
+					double diff = std::abs(A3[i] - other.A3[i + j]);
+					A3_dist += constfactor * std::exp(-j * j / twosigma2) * diff * diff;
+				}
+		A3_dist = std::sqrt(A3_dist);
 
 		for (size_t i = 0; i < D1_size; i++)
 			for (size_t j = -minmax; j <= minmax; j++)
 				if (i + j > 0 && i + j < D1_size)
-					D1_dist += constfactor * std::exp(-j * j / twosigma2) *
-							   std::pow(std::abs(D1[i] - other.D1[i + j]), p);
-		D1_dist = std::pow(D1_dist, 1 / p);
+				{
+					double diff = std::abs(D1[i] - other.D1[i + j]);
+					D1_dist += constfactor * std::exp(-j * j / twosigma2) * diff * diff;
+				}
+		D1_dist = std::sqrt(D1_dist);
 
 		for (size_t i = 0; i < D2_size; i++)
 			for (size_t j = -minmax; j <= minmax; j++)
 				if (i + j > 0 && i + j < D2_size)
-					D2_dist += constfactor * std::exp(-j * j / twosigma2) *
-							   std::pow(std::abs(D2[i] - other.D2[i + j]), p);
-		D2_dist = std::pow(D2_dist, 1 / p);
+				{
+					double diff = std::abs(D2[i] - other.D2[i + j]);
+					D2_dist += constfactor * std::exp(-j * j / twosigma2) * diff * diff;
+				}
+		D2_dist = std::sqrt(D2_dist);
 
 		for (size_t i = 0; i < D3_size; i++)
 			for (size_t j = -minmax; j <= minmax; j++)
 				if (i + j > 0 && i + j < D3_size)
-					D3_dist += constfactor * std::exp(-j * j / twosigma2) *
-							   std::pow(std::abs(D3[i] - other.D3[i + j]), p);
-		D3_dist = std::pow(D3_dist, 1 / p);
+				{
+					double diff = std::abs(D3[i] - other.D3[i + j]);
+					D3_dist += constfactor * std::exp(-j * j / twosigma2) * diff * diff;
+				}
+		D3_dist = std::sqrt(D3_dist);
 
 		for (size_t i = 0; i < D4_size; i++)
 			for (size_t j = -minmax; j <= minmax; j++)
 				if (i + j > 0 && i + j < D4_size)
-					D4_dist += constfactor * std::exp(-j * j / twosigma2) *
-							   std::pow(std::abs(D4[i] - other.D4[i + j]), p);
-		D4_dist = std::pow(D4_dist, 1 / p);
+				{
+					double diff = std::abs(D4[i] - other.D4[i + j]);
+					D4_dist += constfactor * std::exp(-j * j / twosigma2) * diff * diff;
+				}
+		D4_dist = std::sqrt(D4_dist);
 
 		Eigen::VectorXd feature_1(5), feature_2(5);
 		Eigen::MatrixXd W = Eigen::MatrixXd::Identity(5, 5);
@@ -408,7 +417,7 @@ struct FeatureDatabase
 		for (auto &b : f.D3)
 			b /= f.D3_size;
 		for (auto &b : f.D4)
-			b /= f.D4_size;		
+			b /= f.D4_size;
 	}
 
 	void WriteDatabaseInfo(const std::filesystem::path &path)

@@ -48,7 +48,7 @@ const int scrWidth = 1280, scrHeight = 800;
 const int xStart = 280, yStart = 0;
 const int pageSize = 9;
 int page = 0;
-vector<vector<tuple<int, string>>> pages;
+vector<vector<tuple<int, filesystem::path>>> pages;
 
 MatrixXd distances;
 
@@ -241,7 +241,7 @@ class CustomMenu : public igl::opengl::glfw::imgui::ImGuiMenu
 					sort(dists.begin(), dists.end());
 					pages.clear();
 					page = 0;
-					pages.push_back(vector<tuple<int, string>>());
+					pages.push_back(vector<tuple<int, filesystem::path>>());
 					int TP = 0, FP = 0;
 					for (const auto &d : dists)
 					{
@@ -251,7 +251,7 @@ class CustomMenu : public igl::opengl::glfw::imgui::ImGuiMenu
 						if (dist > THRESHOLD)
 							break;
 						if (pages[pages.size() - 1].size() >= pageSize)
-							pages.push_back(vector<tuple<int, string>>());
+							pages.push_back(vector<tuple<int, filesystem::path>>());
 						pages[pages.size() - 1].push_back(d);
 						auto p = m.parent_path();
 						auto m_class = p.string().substr(p.parent_path().string().size() + 1);
@@ -423,8 +423,8 @@ int main(int argc, char *argv[])
 		const int cellWidth = (scrWidth - xStart) / xCount;
 		const int cellHeight = (scrHeight - yStart) / yCount;
 		viewer.core().viewport = Vector4f(0, 0, scrWidth, scrHeight);
-		for (size_t i = 0; i < ceil(pageSize / 3.0); i++)
-			for (size_t j = 1; j <= 3; j++)
+		for (size_t j = 1; j <= 3; j++)
+			for (size_t i = 0; i < ceil(pageSize / 3.0); i++)
 				viewer.append_core(Vector4f(xStart + cellWidth * i,
 											scrHeight - (yStart + cellHeight * j), cellWidth,
 											cellHeight));
