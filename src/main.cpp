@@ -71,6 +71,24 @@ class CustomMenu : public igl::opengl::glfw::imgui::ImGuiMenu
 			classes.push_back(it->first);
 	}
 
+	void set_result_meshes()
+	{
+		for (size_t i = 0; i < pageSize; i++)
+		{
+			viewer->data_list[i + 1].clear();
+			if (i >= pages[page].size())
+				continue;
+			viewer->data_list[i + 1].set_visible(true, viewer->core_list[i + 1].id);
+			int dist;
+			filesystem::path mesh;
+			tie(dist, mesh) = pages[page][i];
+			igl::read_triangle_mesh(mesh.string(), V, F);
+			viewer->data_list[i + 1].set_mesh(V, F);
+		}
+		viewer->core_list[0].viewport = Vector4f(0, 0, xStart, scrHeight);
+		viewer->data_list[0].set_visible(false, viewer->core_list[0].id);
+	}
+
 	virtual void draw_viewer_menu() override
 	{
 		// Draw parent menu
@@ -146,13 +164,13 @@ class CustomMenu : public igl::opengl::glfw::imgui::ImGuiMenu
 			ImGui::PopItemWidth();
 
 			static bool wireframe = true;
-			if(ImGui::Checkbox("Wireframe", &wireframe))
-				for(size_t i = 0; i <= pageSize; i++)
+			if (ImGui::Checkbox("Wireframe", &wireframe))
+				for (size_t i = 0; i <= pageSize; i++)
 					viewer->core_list[i].set(viewer->data_list[i].show_lines, wireframe);
-			
+
 			static bool fill = true;
-			if(ImGui::Checkbox("Fill", &fill))
-				for(size_t i = 0; i <= pageSize; i++)
+			if (ImGui::Checkbox("Fill", &fill))
+				for (size_t i = 0; i <= pageSize; i++)
 					viewer->core_list[i].set(viewer->data_list[i].show_faces, fill);
 		}
 
@@ -208,6 +226,7 @@ class CustomMenu : public igl::opengl::glfw::imgui::ImGuiMenu
 
 			if (filename.size())
 			{
+				ImGui::SameLine();
 				ImGui::Text(filesystem::path(filename).filename().string().c_str());
 				if (curr_class && ImGui::Button("Search"))
 				{
@@ -261,19 +280,32 @@ class CustomMenu : public igl::opengl::glfw::imgui::ImGuiMenu
 						 << "Accuracy: " << double(TP + TN) / total_meshes << endl
 						 << "F1 Score: " << double(2 * TP) / double(2 * TP + FP + FN) << endl;
 
-					for (size_t i = 0; i < pageSize; i++)
-					{
-						int dist;
-						filesystem::path mesh;
-						tie(dist, mesh) = pages[page][i];
-						igl::read_triangle_mesh(mesh.string(), V, F);
-						viewer->data_list[i + 1].set_mesh(V, F);
-						viewer->data_list[i + 1].set_visible(true, viewer->core_list[i + 1].id);
-					}
-					viewer->core_list[0].viewport = Vector4f(0, 0, xStart, scrHeight);
-					viewer->data_list[0].set_visible(false, viewer->core_list[0].id);
+					set_result_meshes();
 					filename = "";
 					curr_class = NULL;
+				}
+			}
+
+			if (pages.size())
+			{
+				if (page > 0)
+				{
+					if (ImGui::ArrowButton("decPage", ImGuiDir_Left))
+					{
+						page = (page - 1) % pages.size();
+						set_result_meshes();
+					}
+					ImGui::SameLine();
+				}
+				ImGui::Text("Page %i", page + 1);
+				if (page < pages.size() - 1)
+				{
+					ImGui::SameLine();
+					if (ImGui::ArrowButton("incPage", ImGuiDir_Right))
+					{
+						page = (page + 1) % pages.size();
+						set_result_meshes();
+					}
 				}
 			}
 		}
