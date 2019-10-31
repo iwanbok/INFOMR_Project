@@ -10,6 +10,7 @@
 
 #define THRESHOLD 1
 
+#include <igl/opengl/MeshGL.h>
 #include <igl/opengl/glfw/Viewer.h>
 #include <igl/opengl/glfw/imgui/ImGuiHelpers.h>
 #include <igl/opengl/glfw/imgui/ImGuiMenu.h>
@@ -43,6 +44,12 @@ vector<string> classes;
 map<string, int> ccs;
 int total_meshes;
 
+const int scrWidth = 1280, scrHeight = 800;
+const int xStart = 280, yStart = 0;
+const int pageSize = 9;
+int page = 0;
+vector<vector<tuple<int, string>>> pages;
+
 MatrixXd distances;
 
 class CustomMenu : public igl::opengl::glfw::imgui::ImGuiMenu
@@ -67,7 +74,87 @@ class CustomMenu : public igl::opengl::glfw::imgui::ImGuiMenu
 	virtual void draw_viewer_menu() override
 	{
 		// Draw parent menu
-		ImGuiMenu::draw_viewer_menu();
+		// ImGuiMenu::draw_viewer_menu();
+		int data_id = viewer->core_index(viewer->core().id);
+
+		// Viewing options
+		if (ImGui::CollapsingHeader("Viewing Options", ImGuiTreeNodeFlags_DefaultOpen))
+		{
+			if (ImGui::Button("Center object", ImVec2(-1, 0)))
+			{
+				viewer->core().align_camera_center(viewer->data(data_id).V,
+												   viewer->data(data_id).F);
+			}
+			if (ImGui::Button("Snap canonical view", ImVec2(-1, 0)))
+			{
+				viewer->snap_to_canonical_quaternion();
+			}
+
+			// Zoom
+			ImGui::PushItemWidth(80 * menu_scaling());
+			ImGui::DragFloat("Zoom", &(viewer->core().camera_zoom), 0.05f, 0.1f, 20.0f);
+
+			// Select rotation type
+			int rotation_type = static_cast<int>(viewer->core().rotation_type);
+			static Eigen::Quaternionf trackball_angle = Eigen::Quaternionf::Identity();
+			static bool orthographic = true;
+			if (ImGui::Combo("Camera Type", &rotation_type, "Trackball\0Two Axes\0002D Mode\0\0"))
+			{
+				using RT = igl::opengl::ViewerCore::RotationType;
+				auto new_type = static_cast<RT>(rotation_type);
+				for (auto &c : viewer->core_list)
+					if (new_type != c.rotation_type)
+					{
+						if (new_type == RT::ROTATION_TYPE_NO_ROTATION)
+						{
+							trackball_angle = c.trackball_angle;
+							orthographic = c.orthographic;
+							c.trackball_angle = Eigen::Quaternionf::Identity();
+							c.orthographic = true;
+						}
+						else if (c.rotation_type == RT::ROTATION_TYPE_NO_ROTATION)
+						{
+							c.trackball_angle = trackball_angle;
+							c.orthographic = orthographic;
+						}
+						c.set_rotation_type(new_type);
+					}
+			}
+
+			// Orthographic view
+			ImGui::Checkbox("Orthographic view", &(viewer->core().orthographic));
+			ImGui::PopItemWidth();
+		}
+
+		// Draw options
+		if (ImGui::CollapsingHeader("Draw Options", ImGuiTreeNodeFlags_DefaultOpen))
+		{
+			static bool face_based = false;
+			if (ImGui::Checkbox("Face-based", &face_based))
+			{
+				for (auto &d : viewer->data_list)
+				{
+					d.face_based = face_based;
+					d.dirty = igl::opengl::MeshGL::DIRTY_ALL;
+				}
+			}
+			ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.3f);
+			static float shininess = 50.f;
+			if (ImGui::DragFloat("Shininess", &shininess, 0.05f, 0.0f, 100.0f))
+				for (auto &d : viewer->data_list)
+					d.shininess = shininess;
+			ImGui::PopItemWidth();
+
+			static bool wireframe = true;
+			if(ImGui::Checkbox("Wireframe", &wireframe))
+				for(size_t i = 0; i <= pageSize; i++)
+					viewer->core_list[i].set(viewer->data_list[i].show_lines, wireframe);
+			
+			static bool fill = true;
+			if(ImGui::Checkbox("Fill", &fill))
+				for(size_t i = 0; i <= pageSize; i++)
+					viewer->core_list[i].set(viewer->data_list[i].show_faces, fill);
+		}
 
 		// Add new group
 		if (ImGui::CollapsingHeader("Search Options", ImGuiTreeNodeFlags_DefaultOpen))
@@ -107,9 +194,13 @@ class CustomMenu : public igl::opengl::glfw::imgui::ImGuiMenu
 				{
 					filename = result[0];
 
-					igl::readOFF(filename, V, F);
-					viewer->data().clear();
-					viewer->data().set_mesh(V, F);
+					igl::read_triangle_mesh(filename, V, F);
+					viewer->data_list[0].clear();
+					viewer->data_list[0].set_mesh(V, F);
+					viewer->core_list[0].viewport = Vector4f(0, 0, scrWidth, scrHeight);
+					viewer->data_list[0].set_visible(true, viewer->core_list[0].id);
+					for (size_t i = 0; i < pageSize; i++)
+						viewer->data_list[i + 1].set_visible(false, viewer->core_list[i + 1].id);
 				}
 				open_file = nullptr;
 			}
@@ -129,6 +220,9 @@ class CustomMenu : public igl::opengl::glfw::imgui::ImGuiMenu
 
 					auto dists = fdb.CalcDistances(features);
 					sort(dists.begin(), dists.end());
+					pages.clear();
+					page = 0;
+					pages.push_back(vector<tuple<int, string>>());
 					int TP = 0, FP = 0;
 					for (const auto &d : dists)
 					{
@@ -137,6 +231,9 @@ class CustomMenu : public igl::opengl::glfw::imgui::ImGuiMenu
 						std::tie(dist, m) = d;
 						if (dist > THRESHOLD)
 							break;
+						if (pages[pages.size() - 1].size() >= pageSize)
+							pages.push_back(vector<tuple<int, string>>());
+						pages[pages.size() - 1].push_back(d);
 						auto p = m.parent_path();
 						auto m_class = p.string().substr(p.parent_path().string().size() + 1);
 						if (strcmp(curr_class, m_class.c_str()))
@@ -163,6 +260,18 @@ class CustomMenu : public igl::opengl::glfw::imgui::ImGuiMenu
 						 << "Threat Score: " << TP / double(TP + FN + FP) << endl
 						 << "Accuracy: " << double(TP + TN) / total_meshes << endl
 						 << "F1 Score: " << double(2 * TP) / double(2 * TP + FP + FN) << endl;
+
+					for (size_t i = 0; i < pageSize; i++)
+					{
+						int dist;
+						filesystem::path mesh;
+						tie(dist, mesh) = pages[page][i];
+						igl::read_triangle_mesh(mesh.string(), V, F);
+						viewer->data_list[i + 1].set_mesh(V, F);
+						viewer->data_list[i + 1].set_visible(true, viewer->core_list[i + 1].id);
+					}
+					viewer->core_list[0].viewport = Vector4f(0, 0, xStart, scrHeight);
+					viewer->data_list[0].set_visible(false, viewer->core_list[0].id);
 					filename = "";
 					curr_class = NULL;
 				}
@@ -271,7 +380,33 @@ int main(int argc, char *argv[])
 	igl::readOFF(NORMALIZED_DIR "/Armadillo/281.off", V, F);
 
 	igl::opengl::glfw::Viewer viewer;
-	viewer.data().set_mesh(V, F);
+	for (size_t i = 0; i <= pageSize; i++)
+		viewer.append_mesh();
+	viewer.data_list[0].set_mesh(V, F);
+	viewer.callback_init = [&](igl::opengl::glfw::Viewer &) {
+		viewer.core().viewport = Vector4f(0, 0, scrWidth, scrHeight);
+		const int xCount = int(ceil(pageSize / 3.0));
+		const int yCount = 3;
+		assert(xCount * yCount <= 31);
+		const int cellWidth = (scrWidth - xStart) / xCount;
+		const int cellHeight = (scrHeight - yStart) / yCount;
+		viewer.core().viewport = Vector4f(0, 0, scrWidth, scrHeight);
+		for (size_t i = 0; i < ceil(pageSize / 3.0); i++)
+			for (size_t j = 1; j <= 3; j++)
+				viewer.append_core(Vector4f(xStart + cellWidth * i,
+											scrHeight - (yStart + cellHeight * j), cellWidth,
+											cellHeight));
+
+		for (auto &data : viewer.data_list)
+			for (size_t i = 0; i <= pageSize; i++)
+				data.set_visible(false, viewer.core_list[i].id);
+
+		for (size_t i = 0; i <= pageSize; i++)
+		{
+			viewer.data_list[i].set_visible(true, viewer.core_list[i].id);
+		}
+		return false;
+	};
 
 	viewer.callback_key_down = &key_down;
 	viewer.plugins.push_back(&menu);
