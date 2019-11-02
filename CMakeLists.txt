@@ -12,7 +12,6 @@ option(LIBIGL_WITH_OPENGL_GLFW       "Use GLFW"                     ON)
 option(LIBIGL_WITH_VIEWER            "Use OpenGL viewer"            ON)
 option(LIBIGL_WITH_OPENGL_GLFW_IMGUI "Use OpenGL viewer with ImGui" ON)
 
-
 find_package(LIBIGL REQUIRED QUIET)
 find_package(QHULL REQUIRED QUIET)
 
@@ -24,8 +23,9 @@ add_executable( ${PROJECT_NAME}_bin ${SRCFILES} ${RPLY_FILES} )
 target_link_libraries(${PROJECT_NAME}_bin       PRIVATE igl::core igl::opengl_glfw igl::opengl_glfw_imgui ${qhull_LIBRARIES})
 target_include_directories(${PROJECT_NAME}_bin  PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include ${qhull_INCLUDE_DIRS})
 if(MSVC)
-# enable updated __cplusplus macro value
-if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 19.14)
-    target_compile_options(${PROJECT_NAME}_bin PRIVATE "/Zc:__cplusplus") # available since VS 2017 15.7
-endif()
+    # enable updated __cplusplus macro value
+    if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 19.14)
+        target_compile_options(${PROJECT_NAME}_bin PRIVATE "/Zc:__cplusplus") # available since VS 2017 15.7
+    endif()
+    set_property(DIRECTORY PROPERTY VS_STARTUP_PROJECT ${PROJECT_NAME}_bin)
 endif()

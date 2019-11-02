@@ -8,7 +8,7 @@
 #define FEATURE_DIR ASSET_PATH "features"
 #define INFO_DIR ASSET_PATH "info"
 
-#define THRESHOLD 1
+//#define THRESHOLD 0.45
 
 #include <igl/opengl/MeshGL.h>
 #include <igl/opengl/glfw/Viewer.h>
@@ -27,6 +27,8 @@
 #include <string>
 #include <vector>
 
+#include <ANN/ANN.h>
+
 #include "Open3D/Geometry/TriangleMesh.h"
 #include "Open3D/IO/TriangleMeshIO.h"
 
@@ -42,7 +44,6 @@ MatrixXd V;
 MatrixXi F;
 vector<string> classes;
 map<string, int> ccs;
-int total_meshes;
 
 const int scrWidth = 1280, scrHeight = 800;
 const int xStart = 280, yStart = 0;
@@ -50,25 +51,20 @@ const int pageSize = 9;
 int page = 0;
 vector<vector<tuple<int, filesystem::path>>> pages;
 
+double r_ann = 1.0;
+int k_ann = 10;
+double r_us = 0.45;
+
 MatrixXd distances;
 
 class CustomMenu : public igl::opengl::glfw::imgui::ImGuiMenu
 {
 
   public:
-	CustomMenu()
+	ANNkd_tree f_tree;
+
+	CustomMenu(double **pa, int n) : f_tree(pa, n, Features::size())
 	{
-		std::vector<std::filesystem::path> files = getAllFilesInDir(PREPROCESSED_DIR);
-		total_meshes = files.size();
-		std::sort(files.begin(), files.end());
-		for (auto &f : files)
-		{
-			auto parent = f.parent_path();
-			auto mesh_class = parent.string().substr(parent.parent_path().string().size() + 1);
-			ccs[mesh_class]++;
-		}
-		for (map<string, int>::iterator it = ccs.begin(); it != ccs.end(); ++it)
-			classes.push_back(it->first);
 	}
 
 	void set_result_meshes()
@@ -181,8 +177,8 @@ class CustomMenu : public igl::opengl::glfw::imgui::ImGuiMenu
 			static string filename = "";
 			static const char *curr_class = NULL;
 
-			if (ImGui::BeginCombo("##combo", curr_class)) // The second parameter is the label
-														  // previewed before opening the combo.
+			if (ImGui::BeginCombo("Class", curr_class)) // The second parameter is the label
+														// previewed before opening the combo.
 			{
 				for (int n = 0; n < classes.size(); n++)
 				{
@@ -200,6 +196,31 @@ class CustomMenu : public igl::opengl::glfw::imgui::ImGuiMenu
 				ImGui::EndCombo();
 			}
 
+			const char *algs[] = {"K-nearest ANN", "R-nearest ANN", "Custom"};
+			static const char *curr_alg = algs[0];
+			if (ImGui::BeginCombo("Algorithm", curr_alg))
+			{
+				for (int n = 0; n < IM_ARRAYSIZE(algs); n++)
+				{
+					bool is_selected = (curr_alg == algs[n]);
+					if (ImGui::Selectable(algs[n], is_selected))
+						curr_alg = algs[n];
+					if (is_selected)
+						ImGui::SetItemDefaultFocus();
+				}
+				ImGui::EndCombo();
+			}
+
+			const double minDrag = 0.1, maxDrag = 5.0;
+			if (curr_alg == algs[0])
+				ImGui::DragInt("Number of results", &k_ann, 1.0f, 1, 100);
+			else if (curr_alg == algs[1])
+				ImGui::DragScalar("Radius threshold", ImGuiDataType_Double, &r_ann, 0.05f, &minDrag,
+								  &maxDrag, "%.3f");
+			else if (curr_alg == algs[2])
+				ImGui::DragScalar("Radius threshold", ImGuiDataType_Double, &r_us, 0.05f, &minDrag,
+								  &maxDrag, "%.3f");
+
 			ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)open_file);
 			if (ImGui::Button("Open File"))
 				open_file = std::make_shared<pfd::open_file>(
@@ -213,6 +234,8 @@ class CustomMenu : public igl::opengl::glfw::imgui::ImGuiMenu
 					filename = result[0];
 
 					igl::read_triangle_mesh(filename, V, F);
+					page = 0;
+					pages.clear();
 					viewer->data_list[0].clear();
 					viewer->data_list[0].set_mesh(V, F);
 					viewer->core_list[0].viewport = Vector4f(0, 0, scrWidth, scrHeight);
@@ -237,32 +260,51 @@ class CustomMenu : public igl::opengl::glfw::imgui::ImGuiMenu
 					auto features = CalcFeatures(mesh);
 					fdb.NormalizeFeatures(features);
 
-					auto dists = fdb.CalcDistances(features);
-					sort(dists.begin(), dists.end());
-					pages.clear();
-					page = 0;
 					pages.push_back(vector<tuple<int, filesystem::path>>());
 					int TP = 0, FP = 0;
-					for (const auto &d : dists)
+
+					if (curr_alg == algs[0])
 					{
-						double dist;
-						std::filesystem::path m;
-						std::tie(dist, m) = d;
-						if (dist > THRESHOLD)
-							break;
-						if (pages[pages.size() - 1].size() >= pageSize)
-							pages.push_back(vector<tuple<int, filesystem::path>>());
-						pages[pages.size() - 1].push_back(d);
-						auto p = m.parent_path();
-						auto m_class = p.string().substr(p.parent_path().string().size() + 1);
-						if (strcmp(curr_class, m_class.c_str()))
-							FP++;
-						else
-							TP++;
-						cout << dist << ": " << m << endl;
+						vector<int> nn_idx(k_ann);
+						vector<double> dd(k_ann);
+						f_tree.annkSearch(features.data(), k_ann, nn_idx.data(), dd.data());
+						for (size_t i = 0; i < k_ann; i++)
+							cout << dd[i] << ": " << Features(f_tree.thePoints()[nn_idx[i]]) << endl;
 					}
+					else if (curr_alg == algs[1])
+					{
+						vector<int> nn_idx(numMeshes);
+						vector<double> dd(numMeshes);
+						f_tree.annkFRSearch(features.data(), r_ann * r_ann, numMeshes,
+											nn_idx.data(), dd.data());
+						cout << f_tree.thePoints()[nn_idx[0]][0] << endl;
+					}
+					else if (curr_alg == algs[2])
+					{
+						auto dists = fdb.CalcDistances(features);
+						sort(dists.begin(), dists.end());
+						for (const auto &d : dists)
+						{
+							double dist;
+							std::filesystem::path m;
+							std::tie(dist, m) = d;
+							if (dist > r_us)
+								break;
+							if (pages[pages.size() - 1].size() >= pageSize)
+								pages.push_back(vector<tuple<int, filesystem::path>>());
+							pages[pages.size() - 1].push_back(d);
+							auto p = m.parent_path();
+							auto m_class = p.string().substr(p.parent_path().string().size() + 1);
+							if (strcmp(curr_class, m_class.c_str()))
+								FP++;
+							else
+								TP++;
+							cout << dist << ": " << m << endl;
+						}
+					}
+
 					int P = ccs[string(curr_class)];
-					int N = total_meshes - P;
+					int N = numMeshes - P;
 					int TN = N - FP;
 					int FN = P - TP;
 
@@ -277,7 +319,7 @@ class CustomMenu : public igl::opengl::glfw::imgui::ImGuiMenu
 						 << "Precision: " << TP / double(TP + FP) << endl
 						 << "NPV: " << TN / double(TN + FN) << endl
 						 << "Threat Score: " << TP / double(TP + FN + FP) << endl
-						 << "Accuracy: " << double(TP + TN) / total_meshes << endl
+						 << "Accuracy: " << double(TP + TN) / numMeshes << endl
 						 << "F1 Score: " << double(2 * TP) / double(2 * TP + FP + FN) << endl;
 
 					set_result_meshes();
@@ -310,7 +352,7 @@ class CustomMenu : public igl::opengl::glfw::imgui::ImGuiMenu
 			}
 		}
 	}
-} menu;
+};
 
 bool key_down(igl::opengl::glfw::Viewer &view, unsigned char key, int modifier)
 {
@@ -349,6 +391,7 @@ int main(int argc, char *argv[])
 		if (options.find('n') != options.npos)
 			CalcMeshStatistics(getAllFilesInDir(NORMALIZED_DIR));
 		vector<filesystem::path> normalized = getAllFilesInDir(NORMALIZED_DIR);
+		sort(normalized.begin(), normalized.end(), greater<filesystem::path>());
 		if (!filesystem::exists(FEATURE_DIR))
 			filesystem::create_directories(FEATURE_DIR);
 		fdb = CalculateFeaturesMeshDatabase(normalized);
@@ -356,14 +399,14 @@ int main(int argc, char *argv[])
 	else
 		fdb = FeatureDatabase(FEATURE_DIR);
 
-	distances = MatrixXd::Zero(total_meshes, total_meshes);
+	distances = MatrixXd::Zero(numMeshes, numMeshes);
 	if (options.find('d') == options.npos)
 	{
 		ofstream out(ASSET_PATH "/distances.txt");
-		for (size_t i = 0; i < total_meshes; i++)
+		for (size_t i = 0; i < numMeshes; i++)
 		{
 			auto dists = fdb.CalcDistances(fdb.features[i]);
-			for (size_t j = 0; j < total_meshes; j++)
+			for (size_t j = 0; j < numMeshes; j++)
 			{
 				double dist;
 				filesystem::path m;
@@ -378,20 +421,30 @@ int main(int argc, char *argv[])
 	else
 	{
 		ifstream dist_file(ASSET_PATH "/distances.txt");
-		for (size_t i = 0; i < total_meshes; i++)
-			for (size_t j = 0; j < total_meshes; j++)
+		for (size_t i = 0; i < numMeshes; i++)
+			for (size_t j = 0; j < numMeshes; j++)
 				dist_file >> distances(i, j);
 		dist_file.close();
 	}
 
+	std::vector<std::filesystem::path> files = getAllFilesInDir(PREPROCESSED_DIR);
+	for (auto &f : files)
+	{
+		auto parent = f.parent_path();
+		auto mesh_class = parent.string().substr(parent.parent_path().string().size() + 1);
+		ccs[mesh_class]++;
+	}
+	for (map<string, int>::iterator it = ccs.begin(); it != ccs.end(); ++it)
+		classes.push_back(it->first);
+
 	double recall = 0, precision = 0;
-	for (size_t i = 0; i < total_meshes; i++)
+	for (size_t i = 0; i < numMeshes; i++)
 	{
 		auto parent = fdb.meshes[i].parent_path();
 		auto curr_class = parent.string().substr(parent.parent_path().string().size() + 1);
 		int FP = 0, TP = 0;
-		for (size_t j = 0; j < total_meshes; j++)
-			if (distances(i, j) <= THRESHOLD)
+		for (size_t j = 0; j < numMeshes; j++)
+			if (distances(i, j) <= r_us)
 			{
 				auto p = fdb.meshes[j].parent_path();
 				auto m_class = p.string().substr(p.parent_path().string().size() + 1);
@@ -402,6 +455,8 @@ int main(int argc, char *argv[])
 			}
 		int P = ccs[curr_class];
 		recall += double(TP) / P;
+		if (TP + FP == 0)
+			cout << "WHAT" << endl;
 		precision += TP / double(TP + FP);
 	}
 	recall /= fdb.features.size();
@@ -441,6 +496,7 @@ int main(int argc, char *argv[])
 	};
 
 	viewer.callback_key_down = &key_down;
+	CustomMenu menu((double **)fdb.GetFeatureVectors.data(), fdb.features.size());
 	viewer.plugins.push_back(&menu);
 	viewer.launch();
 	return EXIT_SUCCESS;
