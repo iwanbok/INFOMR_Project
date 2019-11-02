@@ -306,58 +306,67 @@ Features CalcFeatures(const std::shared_ptr<open3d::geometry::TriangleMesh> &mes
 	Histogram<double> A3_hist(0, 0.8 * M_PI, features.A3_size);
 	std::shuffle(mesh->triangles_.begin(), mesh->triangles_.end(),
 				 std::default_random_engine(std::time(0)));
-	auto A3_sample = mesh->SamplePointsUniformly(avgV * 3);
-	std::vector<double> A3_vals(avgV);
-	for (size_t i = 0; i < avgV * 3; i += 3)
+	const size_t s_avgV = size_t(avgV);
+	auto A3_sample = mesh->SamplePointsUniformly(s_avgV * 3);
+	std::vector<double> A3_vals(s_avgV);
+	for (size_t i = 0; i < s_avgV * 3; i += 3)
 	{
 		auto nv_ab = (A3_sample->points_[i + 1] - A3_sample->points_[i]).normalized();
 		auto nv_ac = (A3_sample->points_[i + 2] - A3_sample->points_[i]).normalized();
 		A3_vals[i / 3] = nv_ab.dot(nv_ac);
 	}
 	A3_hist.AddToHistogram(A3_vals);
-	std::memcpy(features.A3(), A3_hist.Normalized().data(), features.A3_size);
+	auto norm = A3_hist.Normalized();
+	for (size_t i = 0; i < features.A3_size; i++)
+		features.A3()[i] = norm[i];
 
 	Histogram<double> D1_hist(0, 0.8 * 1.8, features.D1_size);
 	std::shuffle(mesh->triangles_.begin(), mesh->triangles_.end(),
 				 std::default_random_engine(std::time(0)));
-	auto D1_sample = mesh->SamplePointsUniformly(avgV);
-	std::vector<double> D1_vals(avgV);
+	auto D1_sample = mesh->SamplePointsUniformly(s_avgV);
+	std::vector<double> D1_vals(s_avgV);
 	std::transform(D1_sample->points_.begin(), D1_sample->points_.end(), D1_vals.begin(),
 				   [mesh](const Eigen::Vector3d &p) { return (mesh->GetCenter() - p).norm(); });
 	D1_hist.AddToHistogram(D1_vals);
-	std::memcpy(features.D1(), D1_hist.Normalized().data(), features.D1_size);
+	norm = D1_hist.Normalized();
+	for (size_t i = 0; i < features.D1_size; i++)
+		features.D1()[i] = norm[i];
 
 	Histogram<double> D2_hist(0, 0.8 * 1.8, features.D2_size);
 	std::shuffle(mesh->triangles_.begin(), mesh->triangles_.end(),
 				 std::default_random_engine(std::time(0)));
-	auto D2_sample = mesh->SamplePointsUniformly(avgV * 2);
-	std::vector<double> D2_vals(avgV);
-	for (size_t i = 0; i < avgV * 2; i += 2)
+	auto D2_sample = mesh->SamplePointsUniformly(s_avgV * 2);
+	std::vector<double> D2_vals(s_avgV);
+	for (size_t i = 0; i < s_avgV * 2; i += 2)
 		D2_vals[i / 2] = (D2_sample->points_[i] - D2_sample->points_[i + 1]).norm();
 	D2_hist.AddToHistogram(D2_vals);
-	std::memcpy(features.D2(), D2_hist.Normalized().data(), features.D2_size);
+	norm = D2_hist.Normalized();
+	for (size_t i = 0; i < features.D2_size; i++)
+		features.D2()[i] = norm[i];
 
 	Histogram<double> D3_hist(0, 0.8 * 0.8, features.D3_size);
 	std::shuffle(mesh->triangles_.begin(), mesh->triangles_.end(),
 				 std::default_random_engine(std::time(0)));
-	auto D3_sample = mesh->SamplePointsUniformly(avgV * 3);
-	std::vector<double> D3_vals(avgV);
-	for (size_t i = 0; i < avgV * 3; i += 3)
+	auto D3_sample = mesh->SamplePointsUniformly(s_avgV * 3);
+	std::vector<double> D3_vals(s_avgV);
+	for (size_t i = 0; i < s_avgV * 3; i += 3)
 	{
 		auto v_ab = D3_sample->points_[i + 1] - D3_sample->points_[i];
 		auto v_ac = D3_sample->points_[i + 2] - D3_sample->points_[i];
 		D3_vals[i / 3] = std::sqrt((1.0 / 2.0) * v_ab.cross(v_ac).norm());
 	}
 	D3_hist.AddToHistogram(D3_vals);
-	std::memcpy(features.D3(), D3_hist.Normalized().data(), features.D3_size);
+	norm = D3_hist.Normalized();
+	for (size_t i = 0; i < features.D3_size; i++)
+		features.D3()[i] = norm[i];
 
 	Histogram<double> D4_hist(0, 0.8 * 0.6, features.D4_size);
 	std::shuffle(mesh->triangles_.begin(), mesh->triangles_.end(),
 				 std::default_random_engine(std::time(0)));
-	auto D4_sample = mesh->SamplePointsUniformly(avgV * 4);
-	std::vector<double> D4_vals(avgV);
+	auto D4_sample = mesh->SamplePointsUniformly(s_avgV * 4);
+	std::vector<double> D4_vals(s_avgV);
 	//(1/6) * dot(cross(AB, AC), AD)
-	for (size_t i = 0; i < avgV * 4; i += 4)
+	for (size_t i = 0; i < s_avgV * 4; i += 4)
 	{
 		auto v_ab = D4_sample->points_[i + 1] - D4_sample->points_[i];
 		auto v_ac = D4_sample->points_[i + 2] - D4_sample->points_[i];
@@ -365,7 +374,9 @@ Features CalcFeatures(const std::shared_ptr<open3d::geometry::TriangleMesh> &mes
 		D4_vals[i / 4] = std::cbrt((1.0 / 6.0) * std::abs(v_ab.cross(v_ac).dot(v_ad)));
 	}
 	D4_hist.AddToHistogram(D4_vals);
-	std::memcpy(features.D4(), D4_hist.Normalized().data(), features.D4_size);
+	norm = D4_hist.Normalized();
+	for (size_t i = 0; i < features.D4_size; i++)
+		features.D4()[i] = norm[i];
 
 	return features;
 }
@@ -484,15 +495,6 @@ struct FeatureDatabase
 		for (size_t i = 0; i < features.size(); i++)
 			distances[i] = std::make_tuple(features[i].Distance(f), meshes[i]);
 		return distances;
-	}
-
-	std::vector<double> GetFeatureVectors()
-	{
-		std::vector<double> res;
-		res.reserve(numMeshes * Features::size());
-		for (size_t i = 0; i < numMeshes; i++)
-			res.insert(res.end(), features[i].begin(), features[i].end());
-		return res;
 	}
 };
 

@@ -49,7 +49,7 @@ const int scrWidth = 1280, scrHeight = 800;
 const int xStart = 280, yStart = 0;
 const int pageSize = 9;
 int page = 0;
-vector<vector<tuple<int, filesystem::path>>> pages;
+vector<vector<tuple<double, filesystem::path>>> pages;
 
 double r_ann = 1.0;
 int k_ann = 10;
@@ -260,7 +260,7 @@ class CustomMenu : public igl::opengl::glfw::imgui::ImGuiMenu
 					auto features = CalcFeatures(mesh);
 					fdb.NormalizeFeatures(features);
 
-					pages.push_back(vector<tuple<int, filesystem::path>>());
+					pages.push_back(vector<tuple<double, filesystem::path>>());
 					int TP = 0, FP = 0;
 
 					if (curr_alg == algs[0])
@@ -269,7 +269,19 @@ class CustomMenu : public igl::opengl::glfw::imgui::ImGuiMenu
 						vector<double> dd(k_ann);
 						f_tree.annkSearch(features.data(), k_ann, nn_idx.data(), dd.data());
 						for (size_t i = 0; i < k_ann; i++)
-							cout << dd[i] << ": " << Features(f_tree.thePoints()[nn_idx[i]]) << endl;
+						{
+							auto m = fdb.meshes[nn_idx[i]];
+							if (pages[pages.size() - 1].size() >= pageSize)
+								pages.push_back(vector<tuple<double, filesystem::path>>());
+							pages[pages.size() - 1].push_back(std::make_tuple(dd[i], m));
+							auto p = m.parent_path();
+							auto m_class = p.string().substr(p.parent_path().string().size() + 1);
+							if (strcmp(curr_class, m_class.c_str()))
+								FP++;
+							else
+								TP++;
+							cout << dd[i] << ": " << m << endl;
+						}
 					}
 					else if (curr_alg == algs[1])
 					{
@@ -277,7 +289,20 @@ class CustomMenu : public igl::opengl::glfw::imgui::ImGuiMenu
 						vector<double> dd(numMeshes);
 						f_tree.annkFRSearch(features.data(), r_ann * r_ann, numMeshes,
 											nn_idx.data(), dd.data());
-						cout << f_tree.thePoints()[nn_idx[0]][0] << endl;
+						for (size_t i = 0; nn_idx[i] != -1; i++)
+						{
+							auto m = fdb.meshes[nn_idx[i]];
+							if (pages[pages.size() - 1].size() >= pageSize)
+								pages.push_back(vector<tuple<double, filesystem::path>>());
+							pages[pages.size() - 1].push_back(std::make_tuple(dd[i], m));
+							auto p = m.parent_path();
+							auto m_class = p.string().substr(p.parent_path().string().size() + 1);
+							if (strcmp(curr_class, m_class.c_str()))
+								FP++;
+							else
+								TP++;
+							cout << dd[i] << ": " << m << endl;
+						}
 					}
 					else if (curr_alg == algs[2])
 					{
@@ -291,7 +316,7 @@ class CustomMenu : public igl::opengl::glfw::imgui::ImGuiMenu
 							if (dist > r_us)
 								break;
 							if (pages[pages.size() - 1].size() >= pageSize)
-								pages.push_back(vector<tuple<int, filesystem::path>>());
+								pages.push_back(vector<tuple<double, filesystem::path>>());
 							pages[pages.size() - 1].push_back(d);
 							auto p = m.parent_path();
 							auto m_class = p.string().substr(p.parent_path().string().size() + 1);
@@ -496,7 +521,7 @@ int main(int argc, char *argv[])
 	};
 
 	viewer.callback_key_down = &key_down;
-	CustomMenu menu((double **)fdb.GetFeatureVectors.data(), fdb.features.size());
+	CustomMenu menu((double **)fdb.features.data(), fdb.features.size());
 	viewer.plugins.push_back(&menu);
 	viewer.launch();
 	return EXIT_SUCCESS;
