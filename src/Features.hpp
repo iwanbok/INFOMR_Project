@@ -80,14 +80,6 @@ struct Features
 	{
 		return values.data();
 	}
-	std::vector<double>::iterator begin()
-	{
-		return values.begin();
-	}
-	std::vector<double>::iterator end()
-	{
-		return values.end();
-	}
 	double &surface_area()
 	{
 		return values[0];
