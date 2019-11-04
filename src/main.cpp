@@ -47,7 +47,7 @@ const int scrWidth = 1280, scrHeight = 800;
 const int xStart = 280, yStart = 0;
 const int pageSize = 9;
 int page = 0;
-vector<vector<tuple<double, filesystem::path>>> pages;
+vector<vector<pair<double, filesystem::path>>> pages;
 
 double r_ann = 1.0;
 int k_ann = 20;
@@ -258,7 +258,7 @@ class CustomMenu : public igl::opengl::glfw::imgui::ImGuiMenu
 					auto features = CalcFeatures(mesh);
 					fdb.NormalizeFeatures(features);
 
-					pages.push_back(vector<tuple<double, filesystem::path>>());
+					pages.push_back(vector<pair<double, filesystem::path>>());
 					int TP = 0, FP = 0;
 
 					if (curr_alg == algs[0])
@@ -270,8 +270,8 @@ class CustomMenu : public igl::opengl::glfw::imgui::ImGuiMenu
 						{
 							auto m = fdb.meshes[nn_idx[i]];
 							if (pages[pages.size() - 1].size() >= pageSize)
-								pages.push_back(vector<tuple<double, filesystem::path>>());
-							pages[pages.size() - 1].push_back(std::make_tuple(dd[i], m));
+								pages.push_back(vector<pair<double, filesystem::path>>());
+							pages[pages.size() - 1].push_back(std::make_pair(dd[i], m));
 							auto p = m.parent_path();
 							auto m_class = p.string().substr(p.parent_path().string().size() + 1);
 							if (strcmp(curr_class, m_class.c_str()))
@@ -291,8 +291,8 @@ class CustomMenu : public igl::opengl::glfw::imgui::ImGuiMenu
 						{
 							auto m = fdb.meshes[nn_idx[i]];
 							if (pages[pages.size() - 1].size() >= pageSize)
-								pages.push_back(vector<tuple<double, filesystem::path>>());
-							pages[pages.size() - 1].push_back(std::make_tuple(dd[i], m));
+								pages.push_back(vector<pair<double, filesystem::path>>());
+							pages[pages.size() - 1].push_back(std::make_pair(dd[i], m));
 							auto p = m.parent_path();
 							auto m_class = p.string().substr(p.parent_path().string().size() + 1);
 							if (strcmp(curr_class, m_class.c_str()))
@@ -308,21 +308,18 @@ class CustomMenu : public igl::opengl::glfw::imgui::ImGuiMenu
 						sort(dists.begin(), dists.end());
 						for (const auto &d : dists)
 						{
-							double dist;
-							std::filesystem::path m;
-							std::tie(dist, m) = d;
-							if (dist > r_us)
+							if (d.first > r_us)
 								break;
 							if (pages[pages.size() - 1].size() >= pageSize)
-								pages.push_back(vector<tuple<double, filesystem::path>>());
+								pages.push_back(vector<pair<double, filesystem::path>>());
 							pages[pages.size() - 1].push_back(d);
-							auto p = m.parent_path();
+							auto p = d.second.parent_path();
 							auto m_class = p.string().substr(p.parent_path().string().size() + 1);
 							if (strcmp(curr_class, m_class.c_str()))
 								FP++;
 							else
 								TP++;
-							cout << dist << ": " << m << endl;
+							cout << d.first << ": " << d.second << endl;
 						}
 					}
 
@@ -488,19 +485,17 @@ int main(int argc, char *argv[])
 	delete[] buf2d;*/
 	auto feats = fdb.GetFeatures();
 	CustomMenu menu(feats.data(), fdb.features.size());
-	double recall = 0, precision = 0;
+	map<string, pair<double, double>> classPerf;
+
 	for (size_t i = 0; i < numMeshes; i++)
 	{
 		auto parent = fdb.meshes[i].parent_path();
 		auto curr_class = parent.string().substr(parent.parent_path().string().size() + 1);
 		int FP = 0, TP = 0;
-
+#if 1
 		vector<int> nn_idx(k_ann);
 		vector<double> dd(k_ann);
 		menu.f_tree.annkSearch(&feats[i * Features::size()], k_ann, nn_idx.data(), dd.data());
-		for (double d : dd)
-			cout << d;
-		cout << endl;
 		for (int id : nn_idx)
 		{
 			auto p = fdb.meshes[id].parent_path();
@@ -510,12 +505,43 @@ int main(int argc, char *argv[])
 			else
 				TP++;
 		}
+#else
+		auto dists = fdb.CalcDistances(fdb.features[i]);
+		for (const auto &d : dists)
+		{
+			auto p = d.second.parent_path();
+			auto m_class = p.string().substr(p.parent_path().string().size() + 1);
+			if (d.first <= r_us)
+			{
+				if (curr_class.compare(m_class))
+					FP++;
+				else
+					TP++;
+			}
+		}
+#endif
 		int P = ccs[curr_class];
-		recall += double(TP) / P;
-		precision += TP / double(TP + FP);
+		classPerf[curr_class].first += double(TP) / P;
+		classPerf[curr_class].second += TP / double(TP + FP);
+	}
+
+	double recall = 0, precision = 0;
+	ofstream perf_file(ASSET_PATH "/perf.txt");
+	for (const auto &cs : ccs)
+	{
+		recall += classPerf[cs.first].first;
+		precision += classPerf[cs.first].second;
+		classPerf[cs.first].first /= cs.second;
+		classPerf[cs.first].second /= cs.second;
+		perf_file << cs.first << " " << classPerf[cs.first].first << " "
+				  << classPerf[cs.first].second << endl;
+		cout << cs.first << " " << classPerf[cs.first].first << " " << classPerf[cs.first].second
+			 << endl;
 	}
 	recall /= fdb.features.size();
 	precision /= fdb.features.size();
+	perf_file << "total " << recall << " " << precision << endl;
+	perf_file.close();
 	cout << "Recall over entire database: " << recall << endl
 		 << "Precision over entire database: " << precision << endl;
 

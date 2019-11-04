@@ -500,11 +500,11 @@ struct FeatureDatabase
 		out.close();
 	}
 
-	std::vector<std::tuple<double, std::filesystem::path>> CalcDistances(const Features &f)
+	std::vector<std::pair<double, std::filesystem::path>> CalcDistances(const Features &f)
 	{
-		std::vector<std::tuple<double, std::filesystem::path>> distances(features.size());
+		std::vector<std::pair<double, std::filesystem::path>> distances(features.size());
 		for (size_t i = 0; i < features.size(); i++)
-			distances[i] = std::make_tuple(features[i].Distance(f), meshes[i]);
+			distances[i] = std::make_pair(features[i].Distance(f), meshes[i]);
 		return distances;
 	}
 
