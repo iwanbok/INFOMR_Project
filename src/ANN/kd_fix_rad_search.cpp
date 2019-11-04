@@ -155,7 +155,7 @@ void ANNkd_leaf::ann_FR_search(ANNdist box_dist)
 
 	for (int i = 0; i < n_pts; i++) {	// check points in bucket
 
-		pp = ANNkdFRPts[bkt[i]];		// first coord of next data point
+		pp = &ANNkdFRPts[bkt[i]];		// first coord of next data point
 		qq = ANNkdFRQ;					// first coord of query point
 		dist = 0;
 

@@ -110,7 +110,7 @@ void ANNkd_tree::Print(					// print entire tree
 		out << "    Points:\n";
 		for (int i = 0; i < n_pts; i++) {
 			out << "\t" << i << ": ";
-			annPrintPt(pts[i], dim, out);
+			annPrintPt(&pts[i], dim, out);
 			out << "\n";
 		}
 	}

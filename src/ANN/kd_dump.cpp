@@ -109,7 +109,7 @@ void ANNkd_tree::Dump(					// dump entire tree
 		out << "points " << dim << " " << n_pts << "\n";
 		for (int i = 0; i < n_pts; i++) {
 			out << i << " ";
-			annPrintPt(pts[i], dim, out);
+			annPrintPt(&pts[i], dim, out);
 			out << "\n";
 		}
 	}
@@ -293,7 +293,7 @@ static ANNkd_ptr annReadDump(
 				annError("Point index is out of range", ANNabort);
 			}
 			for (j = 0; j < the_dim; j++) {
-				in >> the_pts[idx][j];			// read point coordinates
+				in >> the_pts[idx * the_dim + j];			// read point coordinates
 			}
 		}
 		in >> str;								// get next major heading

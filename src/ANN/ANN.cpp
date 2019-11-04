@@ -116,11 +116,7 @@ ANNpoint annAllocPt(int dim, ANNcoord c)		// allocate 1 point
    
 ANNpointArray annAllocPts(int n, int dim)		// allocate n pts in dim
 {
-	ANNpointArray pa = new ANNpoint[n];			// allocate points
-	ANNpoint	  p  = new ANNcoord[n*dim];		// allocate space for coords
-	for (int i = 0; i < n; i++) {
-		pa[i] = &(p[i*dim]);
-	}
+	ANNpointArray pa = new ANNcoord[n*dim];		// allocate space for coords
 	return pa;
 }
 
@@ -132,7 +128,6 @@ void annDeallocPt(ANNpoint &p)					// deallocate 1 point
    
 void annDeallocPts(ANNpointArray &pa)			// deallocate points
 {
-	delete [] pa[0];							// dealloc coordinate storage
 	delete [] pa;								// dealloc points
 	pa = NULL;
 }

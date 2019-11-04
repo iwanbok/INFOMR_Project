@@ -55,7 +55,7 @@ void kd_split(
 	cut_dim = annMaxSpread(pa, pidx, n, dim);
 	n_lo = n/2;							// median rank
 										// split about median
-	annMedianSplit(pa, pidx, n, cut_dim, cut_val, n_lo);
+	annMedianSplit(pa, pidx, n, cut_dim, dim, cut_val, n_lo);
 }
 
 //----------------------------------------------------------------------
@@ -97,7 +97,7 @@ void midpt_split(
 										// is it among longest?
 		if (double(bnds.hi[d] - bnds.lo[d]) >= (1-ERR)*max_length) {
 										// compute its spread
-			ANNcoord spr = annSpread(pa, pidx, n, d);
+			ANNcoord spr = annSpread(pa, pidx, n, d, dim);
 			if (spr > max_spread) {		// is it max so far?
 				max_spread = spr;
 				cut_dim = d;
@@ -108,7 +108,7 @@ void midpt_split(
 	cut_val = (bnds.lo[cut_dim] + bnds.hi[cut_dim]) / 2;
 										// permute points accordingly
 	int br1, br2;
-	annPlaneSplit(pa, pidx, n, cut_dim, cut_val, br1, br2);
+	annPlaneSplit(pa, pidx, n, cut_dim, dim, cut_val, br1, br2);
 	//------------------------------------------------------------------
 	//	On return:		pa[0..br1-1] < cut_val
 	//					pa[br1..br2-1] == cut_val
@@ -167,7 +167,7 @@ void sl_midpt_split(
 										// is it among longest?
 		if ((bnds.hi[d] - bnds.lo[d]) >= (1-ERR)*max_length) {
 										// compute its spread
-			ANNcoord spr = annSpread(pa, pidx, n, d);
+			ANNcoord spr = annSpread(pa, pidx, n, d, dim);
 			if (spr > max_spread) {		// is it max so far?
 				max_spread = spr;
 				cut_dim = d;
@@ -178,7 +178,7 @@ void sl_midpt_split(
 	ANNcoord ideal_cut_val = (bnds.lo[cut_dim] + bnds.hi[cut_dim])/2;
 
 	ANNcoord min, max;
-	annMinMax(pa, pidx, n, cut_dim, min, max);	// find min/max coordinates
+	annMinMax(pa, pidx, n, cut_dim, dim, min, max);	// find min/max coordinates
 
 	if (ideal_cut_val < min)			// slide to min or max as needed
 		cut_val = min;
@@ -189,7 +189,7 @@ void sl_midpt_split(
 
 										// permute points accordingly
 	int br1, br2;
-	annPlaneSplit(pa, pidx, n, cut_dim, cut_val, br1, br2);
+	annPlaneSplit(pa, pidx, n, cut_dim, dim, cut_val, br1, br2);
 	//------------------------------------------------------------------
 	//	On return:		pa[0..br1-1] < cut_val
 	//					pa[br1..br2-1] == cut_val
@@ -269,7 +269,7 @@ void fair_split(
 										// without violating aspect ratio?
 		if (((double) max_length)*2.0/((double) length) <= FS_ASPECT_RATIO) {
 										// compute spread along this dim
-			ANNcoord spr = annSpread(pa, pidx, n, d);
+			ANNcoord spr = annSpread(pa, pidx, n, d, dim);
 			if (spr > max_spread) {		// best spread so far
 				max_spread = spr;
 				cut_dim = d;			// this is dimension to cut
@@ -290,20 +290,20 @@ void fair_split(
 
 	int br1, br2;
 										// is median below lo_cut ?
-	if (annSplitBalance(pa, pidx, n, cut_dim, lo_cut) >= 0) {
+	if (annSplitBalance(pa, pidx, n, cut_dim, dim, lo_cut) >= 0) {
 		cut_val = lo_cut;				// cut at lo_cut
-		annPlaneSplit(pa, pidx, n, cut_dim, cut_val, br1, br2);
+		annPlaneSplit(pa, pidx, n, cut_dim, dim, cut_val, br1, br2);
 		n_lo = br1;
 	}
 										// is median above hi_cut?
-	else if (annSplitBalance(pa, pidx, n, cut_dim, hi_cut) <= 0) {
+	else if (annSplitBalance(pa, pidx, n, cut_dim, dim, hi_cut) <= 0) {
 		cut_val = hi_cut;				// cut at hi_cut
-		annPlaneSplit(pa, pidx, n, cut_dim, cut_val, br1, br2);
+		annPlaneSplit(pa, pidx, n, cut_dim, dim, cut_val, br1, br2);
 		n_lo = br2;
 	}
 	else {								// median cut preserves asp ratio
 		n_lo = n/2;						// split about median
-		annMedianSplit(pa, pidx, n, cut_dim, cut_val, n_lo);
+		annMedianSplit(pa, pidx, n, cut_dim, dim, cut_val, n_lo);
 	}
 }
 
@@ -375,7 +375,7 @@ void sl_fair_split(
 										// without violating aspect ratio?
 		if (((double) max_length)*2.0/((double) length) <= FS_ASPECT_RATIO) {
 										// compute spread along this dim
-			ANNcoord spr = annSpread(pa, pidx, n, d);
+			ANNcoord spr = annSpread(pa, pidx, n, d, dim);
 			if (spr > max_spread) {		// best spread so far
 				max_spread = spr;
 				cut_dim = d;			// this is dimension to cut
@@ -394,35 +394,35 @@ void sl_fair_split(
 	ANNcoord lo_cut = bnds.lo[cut_dim] + small_piece;// lowest legal cut
 	ANNcoord hi_cut = bnds.hi[cut_dim] - small_piece;// highest legal cut
 										// find min and max along cut_dim
-	annMinMax(pa, pidx, n, cut_dim, min, max);
+	annMinMax(pa, pidx, n, cut_dim, dim, min, max);
 										// is median below lo_cut?
-	if (annSplitBalance(pa, pidx, n, cut_dim, lo_cut) >= 0) {
+	if (annSplitBalance(pa, pidx, n, cut_dim, dim, lo_cut) >= 0) {
 		if (max > lo_cut) {				// are any points above lo_cut?
 			cut_val = lo_cut;			// cut at lo_cut
-			annPlaneSplit(pa, pidx, n, cut_dim, cut_val, br1, br2);
+			annPlaneSplit(pa, pidx, n, cut_dim, dim, cut_val, br1, br2);
 			n_lo = br1;					// balance if there are ties
 		}
 		else {							// all points below lo_cut
 			cut_val = max;				// cut at max value
-			annPlaneSplit(pa, pidx, n, cut_dim, cut_val, br1, br2);
+			annPlaneSplit(pa, pidx, n, cut_dim, dim, cut_val, br1, br2);
 			n_lo = n-1;
 		}
 	}
 										// is median above hi_cut?
-	else if (annSplitBalance(pa, pidx, n, cut_dim, hi_cut) <= 0) {
+	else if (annSplitBalance(pa, pidx, n, cut_dim, dim, hi_cut) <= 0) {
 		if (min < hi_cut) {				// are any points below hi_cut?
 			cut_val = hi_cut;			// cut at hi_cut
-			annPlaneSplit(pa, pidx, n, cut_dim, cut_val, br1, br2);
+			annPlaneSplit(pa, pidx, n, cut_dim, dim, cut_val, br1, br2);
 			n_lo = br2;					// balance if there are ties
 		}
 		else {							// all points above hi_cut
 			cut_val = min;				// cut at min value
-			annPlaneSplit(pa, pidx, n, cut_dim, cut_val, br1, br2);
+			annPlaneSplit(pa, pidx, n, cut_dim, dim, cut_val, br1, br2);
 			n_lo = 1;
 		}
 	}
 	else {								// median cut is good enough
 		n_lo = n/2;						// split about median
-		annMedianSplit(pa, pidx, n, cut_dim, cut_val, n_lo);
+		annMedianSplit(pa, pidx, n, cut_dim, dim, cut_val, n_lo);
 	}
 }

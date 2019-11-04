@@ -63,6 +63,8 @@ class Histogram
 	}
 };
 
+const double weight[] = {1, 1, 2, 1, 1, 2, 4, 2, 4, 2};
+
 struct Features
 {
   private:
@@ -74,6 +76,22 @@ struct Features
 	static int size()
 	{
 		return 5 + A3_size + D1_size + D2_size + D3_size + D4_size;
+	}
+
+	static int weightIndex(int dataIdx)
+	{
+		if (dataIdx < 5)
+			return dataIdx;
+		else if (dataIdx < 5 + A3_size)
+			return 5;
+		else if (dataIdx < 5 + A3_size + D1_size)
+			return 6;
+		else if (dataIdx < 5 + A3_size + D1_size + D2_size)
+			return 7;
+		else if (dataIdx < 5 + A3_size + D1_size + D2_size + D3_size)
+			return 8;
+		else
+			return 9;
 	}
 
 	double *data()
@@ -222,15 +240,16 @@ struct Features
 		double D4_dist = emd(&D4_left, &D4_right, dist, NULL, NULL);
 
 		Eigen::VectorXd feature_1(5), feature_2(5);
-		Eigen::MatrixXd W = Eigen::MatrixXd::Identity(5, 5);
-		W.diagonal() << 1, 1, 2, 1, 1;
 		feature_1 << surface_area(), compactness(), aabbV(), diameter(), eccentricity();
 		feature_2 << other.surface_area(), other.compactness(), other.aabbV(), other.diameter(),
 			other.eccentricity();
 
-		double glob_dist = (feature_1 - feature_2).transpose() * W * (feature_1 - feature_2);
+		Eigen::Matrix<double, 10, 1> W(weight);
+		auto glob_dist = (feature_1 - feature_2).cwiseAbs2();
+		Eigen::Matrix<double, 10, 1> diff;
+		diff << glob_dist, A3_dist, D1_dist, D2_dist, D3_dist, D4_dist;
 
-		return glob_dist + (A3_dist + 2 * D1_dist + D2_dist + 2 * D3_dist + D4_dist) * 2;
+		return diff.cwiseProduct(W).sum();
 	}
 };
 
@@ -487,6 +506,15 @@ struct FeatureDatabase
 		for (size_t i = 0; i < features.size(); i++)
 			distances[i] = std::make_tuple(features[i].Distance(f), meshes[i]);
 		return distances;
+	}
+
+	std::vector<double> GetFeatures()
+	{
+		std::vector<double> res(numMeshes * Features::size());
+		for (size_t i = 0; i < numMeshes; i++)
+			for (size_t j = 0; j < Features::size(); j++)
+				res[i * Features::size() + j] = features[i].data()[j];
+		return res;
 	}
 };
 

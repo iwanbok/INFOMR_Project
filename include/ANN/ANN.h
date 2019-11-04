@@ -347,7 +347,7 @@ const ANNbool	ANN_ALLOW_SELF_MATCH	= ANNtrue;
 //----------------------------------------------------------------------
 
 typedef ANNcoord* ANNpoint;			// a point
-typedef ANNpoint* ANNpointArray;	// an array of points 
+typedef ANNcoord* ANNpointArray;	// an array of points 
 typedef ANNdist*  ANNdistArray;		// an array of distances 
 typedef ANNidx*   ANNidxArray;		// an array of point indices
 

@@ -61,7 +61,7 @@ class CustomMenu : public igl::opengl::glfw::imgui::ImGuiMenu
   public:
 	ANNkd_tree f_tree;
 
-	CustomMenu(double **pa, int n) : f_tree(pa, n, Features::size())
+	CustomMenu(double *pa, int n) : f_tree(pa, n, Features::size())
 	{
 	}
 
@@ -486,17 +486,21 @@ int main(int argc, char *argv[])
 	for (size_t i = 0; i < n; i++)
 		delete[] buf2d[i];
 	delete[] buf2d;*/
-
-	CustomMenu menu((double **)fdb.features.data(), fdb.features.size());
+	auto feats = fdb.GetFeatures();
+	CustomMenu menu(feats.data(), fdb.features.size());
 	double recall = 0, precision = 0;
 	for (size_t i = 0; i < numMeshes; i++)
 	{
 		auto parent = fdb.meshes[i].parent_path();
 		auto curr_class = parent.string().substr(parent.parent_path().string().size() + 1);
 		int FP = 0, TP = 0;
+
 		vector<int> nn_idx(k_ann);
 		vector<double> dd(k_ann);
-		menu.f_tree.annkSearch(fdb.features[i].data(), k_ann, nn_idx.data(), dd.data());
+		menu.f_tree.annkSearch(&feats[i * Features::size()], k_ann, nn_idx.data(), dd.data());
+		for (double d : dd)
+			cout << d;
+		cout << endl;
 		for (int id : nn_idx)
 		{
 			auto p = fdb.meshes[id].parent_path();

@@ -67,7 +67,7 @@ void ANNbruteForce::annkSearch(			// approx k near neighbor search
 										// run every point through queue
 	for (i = 0; i < n_pts; i++) {
 										// compute distance to point
-		ANNdist sqDist = annDist(dim, pts[i], q);
+		ANNdist sqDist = annDist(dim, &pts[i], q);
 		if (ANN_ALLOW_SELF_MATCH || sqDist != 0)
 			mk.insert(sqDist, i);
 	}
@@ -91,7 +91,7 @@ int ANNbruteForce::annkFRSearch(		// approx fixed-radius kNN search
 										// run every point through queue
 	for (i = 0; i < n_pts; i++) {
 										// compute distance to point
-		ANNdist sqDist = annDist(dim, pts[i], q);
+		ANNdist sqDist = annDist(dim, &pts[i], q);
 		if (sqDist <= sqRad &&			// within radius bound
 			(ANN_ALLOW_SELF_MATCH || sqDist != 0)) { // ...and no self match
 			mk.insert(sqDist, i);
