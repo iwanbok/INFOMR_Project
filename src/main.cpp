@@ -488,28 +488,10 @@ int main(int argc, char *argv[])
 	for (size_t i = 0; i < n; i++)
 		delete[] buf2d[i];
 	delete[] buf2d;*/
-	plt::plot({1,3,2,4});
-    plt::show();
-	
+
 	auto feats = fdb.GetFeatures();
 	CustomMenu menu(feats.data(), fdb.features.size());
 	map<string, pair<double, double>> classPerf;
-
-	if (options.find('s') == options.npos)
-	{
-		auto why_you_edit_pointer = fdb.GetFeatures();
-		int out_dim = 2;
-		double *Y = (double *)malloc(numMeshes * out_dim * sizeof(double));
-		double *costs = (double *)calloc(numMeshes, sizeof(double));
-		TSNE::run(why_you_edit_pointer.data(), numMeshes, Features::size(), Y, out_dim, 50, 0.5, -1,
-				  false, 1000, 250, 250);
-		for (size_t i = 0; i < numMeshes; i++)
-		{
-			for (size_t j = 0; j < out_dim; j++)
-				cout << Y[i * out_dim + j] << " ";
-			cout << endl;
-		}
-	}
 
 	for (size_t i = 0; i < numMeshes; i++)
 	{
@@ -600,5 +582,26 @@ int main(int argc, char *argv[])
 	viewer.callback_key_down = &key_down;
 	viewer.plugins.push_back(&menu);
 	viewer.launch();
+
+	if (options.find('s') == options.npos)
+	{
+		auto why_you_edit_pointer = fdb.GetFeatures();
+		int out_dim = 2;
+		double *OUT = (double *)malloc(numMeshes * out_dim * sizeof(double));
+		double *costs = (double *)calloc(numMeshes, sizeof(double));
+		TSNE::run(why_you_edit_pointer.data(), numMeshes, Features::size(), OUT, out_dim, 50, 0.5,
+				  -1, false, 1000, 250, 250);
+		vector<double> X(numMeshes);
+		vector<double> Y(numMeshes);
+		vector<double> C(numMeshes);
+		for (size_t i = 0; i < numMeshes; i++)
+		{
+			X[i] = OUT[i * out_dim + 0];
+			Y[i] = OUT[i * out_dim + 1];
+			C[i] = (i / 20) / 20.f;
+		}
+		plt::scatter(X, Y, C, "tab20", 20.0);
+		plt::show();
+	}
 	return EXIT_SUCCESS;
 }

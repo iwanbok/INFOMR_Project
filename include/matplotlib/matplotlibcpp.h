@@ -656,18 +656,23 @@ bool hist(const std::vector<Numeric>& y, long bins=10,std::string color="b",
 #endif // WITH_OPENCV
 #endif // WITHOUT_NUMPY
 
-template<typename NumericX, typename NumericY>
+template<typename NumericX, typename NumericY, typename NumericC>
 bool scatter(const std::vector<NumericX>& x,
              const std::vector<NumericY>& y,
+             const std::vector<NumericC>& c,
+             const char *cmap = "tab20", 
              const double s=1.0) // The marker size in points**2
 {
     assert(x.size() == y.size());
 
     PyObject* xarray = get_array(x);
     PyObject* yarray = get_array(y);
+    PyObject* carray = get_array(c);
 
     PyObject* kwargs = PyDict_New();
-    PyDict_SetItemString(kwargs, "s", PyLong_FromLong(s));
+    PyDict_SetItemString(kwargs, "s", PyFloat_FromDouble(s));
+    PyDict_SetItemString(kwargs, "c", carray);
+    PyDict_SetItemString(kwargs, "cmap", PyString_FromString(cmap));
 
     PyObject* plot_args = PyTuple_New(2);
     PyTuple_SetItem(plot_args, 0, xarray);
