@@ -32,9 +32,6 @@
 
 #include "tsne/tsne.h"
 
-#include <matplotlib/matplotlibcpp.h>
-namespace plt = matplotlibcpp;
-
 #include "Features.hpp"
 #include "Normalize.hpp"
 #include "PreProcess.hpp"
@@ -587,21 +584,14 @@ int main(int argc, char *argv[])
 	{
 		auto why_you_edit_pointer = fdb.GetFeatures();
 		int out_dim = 2;
-		double *OUT = (double *)malloc(numMeshes * out_dim * sizeof(double));
+		double *out_vec = (double *)malloc(numMeshes * out_dim * sizeof(double));
 		double *costs = (double *)calloc(numMeshes, sizeof(double));
-		TSNE::run(why_you_edit_pointer.data(), numMeshes, Features::size(), OUT, out_dim, 50, 0.5,
-				  -1, false, 1000, 250, 250);
-		vector<double> X(numMeshes);
-		vector<double> Y(numMeshes);
-		vector<double> C(numMeshes);
+		TSNE::run(why_you_edit_pointer.data(), numMeshes, Features::size(), out_vec, out_dim, 50,
+				  0.5, -1, false, 1000, 250, 250);
+		ofstream tsne_file(ASSET_PATH "/tsne.txt");
 		for (size_t i = 0; i < numMeshes; i++)
-		{
-			X[i] = OUT[i * out_dim + 0];
-			Y[i] = OUT[i * out_dim + 1];
-			C[i] = (i / 20) / 20.f;
-		}
-		plt::scatter(X, Y, C, "tab20", 20.0);
-		plt::show();
+			tsne_file << out_vec[i * out_dim + 0] << " " << out_vec[i * out_dim + 1] << endl;
+		tsne_file.close();
 	}
 	return EXIT_SUCCESS;
 }
