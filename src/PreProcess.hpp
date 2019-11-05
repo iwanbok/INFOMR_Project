@@ -20,7 +20,7 @@ void PreProcess(std::shared_ptr<open3d::geometry::TriangleMesh> &mesh)
 	mesh->RemoveUnreferencedVertices();
 	if (mesh->triangles_.size() < lowerBoundF)
 		while (mesh->triangles_.size() < targetF)
-			mesh = mesh->SubdivideLoop(1);
+			mesh = mesh->SubdivideMidpoint(1);
 	if (mesh->triangles_.size() > upperBoundF)
 		mesh = mesh->SimplifyQuadricDecimation(targetF);
 }

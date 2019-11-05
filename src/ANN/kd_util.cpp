@@ -135,10 +135,10 @@ ANNdist annBoxDistance( // compute distance from point to box
 	const ANNpoint hi,  // high point of box
 	int dim)			// dimension of space
 {
-	register ANNdist dist = 0.0; // sum of squared distances
-	register ANNdist t;
+	ANNdist dist = 0.0; // sum of squared distances
+	ANNdist t;
 
-	for (register int d = 0; d < dim; d++)
+	for (int d = 0; d < dim; d++)
 	{
 		if (q[d] < lo[d])
 		{ // q is left of box
@@ -266,8 +266,8 @@ void annMedianSplit(ANNpointArray pa, // points to split
 	int r = n - 1; // right end of current subarray
 	while (l < r)
 	{
-		register int i = (r + l) / 2; // select middle as pivot
-		register int k;
+		int i = (r + l) / 2; // select middle as pivot
+		int k;
 
 		if (PA(i, d, dd) > PA(r, d, dd)) // make sure last > pivot
 			PASWAP(i, r)
