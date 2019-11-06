@@ -71,6 +71,25 @@ class CustomMenu : public igl::opengl::glfw::imgui::ImGuiMenu
 	{
 	}
 
+	void reset_camera(igl::opengl::ViewerCore &c)
+	{
+		c.camera_zoom = 1;
+		c.trackball_angle = Eigen::Quaternionf::Identity();
+
+		// Camera parameters
+		c.camera_base_zoom = 1.0f;
+		c.camera_zoom = 1.0f;
+		c.orthographic = false;
+		c.camera_view_angle = 45.0;
+		c.camera_dnear = 1.0;
+		c.camera_dfar = 100.0;
+		c.camera_base_translation << 0, 0, 0;
+		c.camera_translation << 0, 0, 0;
+		c.camera_eye << 0, 0, 5;
+		c.camera_center << 0, 0, 0;
+		c.camera_up << 0, 1, 0;
+	}
+
 	void set_result_meshes()
 	{
 		for (size_t i = 0; i < pageSize; i++)
@@ -84,6 +103,9 @@ class CustomMenu : public igl::opengl::glfw::imgui::ImGuiMenu
 			tie(dist, mesh) = pages[page][i];
 			igl::read_triangle_mesh(mesh.string(), V, F);
 			viewer->data_list[i + 1].set_mesh(V, F);
+
+			// Resetting camera parameters
+			reset_camera(viewer->core_list[i + 1]);
 		}
 		viewer->core_list[0].viewport = Vector4f(0, 0, xStart, scrHeight);
 		viewer->data_list[0].set_visible(false, viewer->core_list[0].id);
@@ -110,23 +132,23 @@ class CustomMenu : public igl::opengl::glfw::imgui::ImGuiMenu
 	{
 		// Draw parent menu
 		// ImGuiMenu::draw_viewer_menu();
-		int data_id = viewer->core_index(viewer->core().id);
 
 		// Viewing options
 		if (ImGui::CollapsingHeader("Viewing Options", ImGuiTreeNodeFlags_DefaultOpen))
 		{
-			if (ImGui::Button("Center object", ImVec2(-1, 0)))
+			/*if (ImGui::Button("Fit model to viewport", ImVec2(-1, 0)))
 			{
-				viewer->core().align_camera_center(viewer->data(data_id).V,
-												   viewer->data(data_id).F);
-			}
+				int data_id = viewer->core_index(viewer->core().id);
+				viewer->core().align_camera_center(viewer->data_list[data_id].V,
+												   viewer->data_list[data_id].F);
+			}*/
 			if (ImGui::Button("Snap canonical view", ImVec2(-1, 0)))
-			{
 				viewer->snap_to_canonical_quaternion();
-			}
+			if (ImGui::Button("Reset camera", ImVec2(-1, 0)))
+				reset_camera(viewer->core());
 
-			// Zoom
-			ImGui::PushItemWidth(80 * menu_scaling());
+				// Zoom
+				ImGui::PushItemWidth(80 * menu_scaling());
 			ImGui::DragFloat("Zoom", &(viewer->core().camera_zoom), 0.05f, 0.1f, 20.0f);
 
 			// Select rotation type
@@ -301,10 +323,13 @@ class CustomMenu : public igl::opengl::glfw::imgui::ImGuiMenu
 						vector<int> nn_idx(numMeshes);
 						vector<double> dd(numMeshes);
 						features.WeightFeatures(ann_weights);
-						f_tree.annkFRSearch(features.data(), r_ann * r_ann, numMeshes,
-											nn_idx.data(), dd.data());
-						for (size_t i = 0; nn_idx[i] != -1; i++)
+						f_tree.annkSearch(features.data(), numMeshes, nn_idx.data(), dd.data());
+						for (size_t i = 0; i < numMeshes; i++)
+						{
+							if (dd[i] > r_ann)
+								break;
 							setup_pages_and_stats(make_pair(dd[i], fdb.meshes[nn_idx[i]]));
+						}
 					}
 					else if (curr_alg == algs[2])
 					{
