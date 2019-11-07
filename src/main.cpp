@@ -287,6 +287,7 @@ class CustomMenu : public igl::opengl::glfw::imgui::ImGuiMenu
 					viewer->data_list[0].set_mesh(V, F);
 					viewer->core_list[0].viewport = Vector4f(0, 0, scrWidth, scrHeight);
 					viewer->data_list[0].set_visible(true, viewer->core_list[0].id);
+					reset_camera(viewer->core_list[0]);
 					for (size_t i = 0; i < pageSize; i++)
 						viewer->data_list[i + 1].set_visible(false, viewer->core_list[i + 1].id);
 				}
