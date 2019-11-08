@@ -63,8 +63,6 @@ class Histogram
 	}
 };
 
-const std::vector<double> us_weights({2, 3, 1, 1, 2, 5, 5, 4, 1, 5});
-
 struct Features
 {
   private:
@@ -245,22 +243,14 @@ struct Features
 		feature_2 << other.surface_area(), other.compactness(), other.aabbV(), other.diameter(),
 			other.eccentricity();
 
-		Eigen::Matrix<double, 10, 1> W(us_weights.data());
 		auto glob_dist = (feature_1 - feature_2).cwiseAbs2();
-		Eigen::Matrix<double, 10, 1> diff;
-		diff << glob_dist, A3_dist, D1_dist, D2_dist, D3_dist, D4_dist;
 		
-		return diff.cwiseProduct(W).sum();
+		return glob_dist.sum() + A3_dist + D1_dist + D2_dist + D3_dist + D4_dist;
 
 #else
-
 		Eigen::Matrix<double, 55, 1> l(data());
-		for (size_t i = 0; i < size(); i++)
-			l(i) *= us_weights[weightIndex(i)];
 		Eigen::Matrix<double, 55, 1> r(other.data());
-		for (size_t i = 0; i < size(); i++)
-			r(i) *= us_weights[weightIndex(i)];
-#if 1 // L2
+#if 0 // L2
 		return (l - r).cwiseAbs2().sum();
 #else // L1
 		return (l - r).cwiseAbs().sum();
@@ -532,13 +522,29 @@ struct FeatureDatabase
 	}
 
 	template <typename T>
-	std::vector<double> GetFeatures(const std::vector<T> &weights)
+	void WeightFeatures(const std::vector<T> &weights)
+	{
+		for (auto &f : features)
+			f.WeightFeatures(weights);
+	}
+
+	template <typename T>
+	std::vector<double> GetWeightedFeatures(const std::vector<T> &weights)
 	{
 		std::vector<double> res(numMeshes * Features::size());
 		for (size_t i = 0; i < numMeshes; i++)
 			for (size_t j = 0; j < Features::size(); j++)
 				res[i * Features::size() + j] =
 					weights[Features::weightIndex(j)] * features[i].data()[j];
+		return res;
+	}
+
+	std::vector<double> GetFeatureVectors()
+	{
+		std::vector<double> res(numMeshes * Features::size());
+		for (size_t i = 0; i < numMeshes; i++)
+			for (size_t j = 0; j < Features::size(); j++)
+				res[i * Features::size() + j] = features[i].data()[j];
 		return res;
 	}
 };
