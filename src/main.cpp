@@ -57,8 +57,6 @@ double r_us = 0.45;
 int k_us = 20;
 std::vector<int> ann_weights({1, 1, 1, 1, 1, 1, 1, 1, 1, 1});
 
-MatrixXd distances;
-
 class CustomMenu : public igl::opengl::glfw::imgui::ImGuiMenu
 {
 
@@ -147,8 +145,8 @@ class CustomMenu : public igl::opengl::glfw::imgui::ImGuiMenu
 			if (ImGui::Button("Reset camera", ImVec2(-1, 0)))
 				reset_camera(viewer->core());
 
-				// Zoom
-				ImGui::PushItemWidth(80 * menu_scaling());
+			// Zoom
+			ImGui::PushItemWidth(80 * menu_scaling());
 			ImGui::DragFloat("Zoom", &(viewer->core().camera_zoom), 0.05f, 0.1f, 20.0f);
 
 			// Select rotation type
@@ -416,12 +414,15 @@ int main(int argc, char *argv[])
 	if (options.find('h') != options.npos)
 	{
 		cout << "Command line options:" << endl
-			 << "\t-p: Skip database preprocessing" << endl
-			 << "\t-n: Skip database normalization" << endl
-			 << "\t-f: Skip database feature calculations" << endl;
+			 << "\t-h: This help menu" << endl
+			 << "\t-p: Preprocess Database" << endl
+			 << "\t-n: Normalize Meshes" << endl
+			 << "\t-f: Calculate database feautures" << endl
+			 << "\t-s: Calculate database retrieval performance statistics" << endl
+			 << "\t-t: Perform T-SNE calculation" << endl;
 		return EXIT_SUCCESS;
 	}
-	if (options.find('p') == options.npos)
+	if (options.find('p') != options.npos)
 	{
 		vector<filesystem::path> originals = getAllFilesInDir(ORIGINAL_DIR);
 		if (!filesystem::exists(PREPROCESSED_DIR))
@@ -429,7 +430,7 @@ int main(int argc, char *argv[])
 		PreProcessMeshDatabase(originals);
 	}
 
-	if (options.find('n') == options.npos)
+	if (options.find('n') != options.npos)
 	{
 		vector<filesystem::path> preprossed = getAllFilesInDir(PREPROCESSED_DIR);
 		if (!filesystem::exists(NORMALIZED_DIR))
@@ -437,9 +438,9 @@ int main(int argc, char *argv[])
 		NormalizeMeshDataBase(preprossed);
 	}
 
-	if (options.find('f') == options.npos)
+	if (options.find('f') != options.npos)
 	{
-		if (options.find('n') != options.npos)
+		if (options.find('n') == options.npos)
 			CalcMeshStatistics(getAllFilesInDir(NORMALIZED_DIR));
 		vector<filesystem::path> normalized = getAllFilesInDir(NORMALIZED_DIR);
 		sort(normalized.begin(), normalized.end(), greater<filesystem::path>());
@@ -449,34 +450,6 @@ int main(int argc, char *argv[])
 	}
 	else
 		fdb = FeatureDatabase(FEATURE_DIR);
-
-	distances = MatrixXd::Zero(numMeshes, numMeshes);
-	if (options.find('d') == options.npos)
-	{
-		ofstream out(ASSET_PATH "/distances.txt");
-		for (size_t i = 0; i < numMeshes; i++)
-		{
-			auto dists = fdb.CalcDistances(fdb.features[i]);
-			for (size_t j = 0; j < numMeshes; j++)
-			{
-				double dist;
-				filesystem::path m;
-				tie(dist, m) = dists[j];
-				out << dist << " ";
-				distances(i, j) = dist;
-			}
-			out << endl;
-		}
-		out.close();
-	}
-	else
-	{
-		ifstream dist_file(ASSET_PATH "/distances.txt");
-		for (size_t i = 0; i < numMeshes; i++)
-			for (size_t j = 0; j < numMeshes; j++)
-				dist_file >> distances(i, j);
-		dist_file.close();
-	}
 
 	std::vector<std::filesystem::path> files = getAllFilesInDir(PREPROCESSED_DIR);
 	for (auto &f : files)
@@ -488,34 +461,7 @@ int main(int argc, char *argv[])
 	for (map<string, int>::iterator it = ccs.begin(); it != ccs.end(); ++it)
 		classes.push_back(it->first);
 
-	/*double **buf2d;
-	const int dim = 5;
-	const int n = 20;
-	buf2d = new double *[n];
-	for (size_t i = 0; i < n; i++)
-		buf2d[i] = new double[dim];
-
-	for (size_t i = 0; i < n; i++)
-		for (size_t j = 0; j < dim; j++)
-			buf2d[i][j] = fdb.features[200 + i].data()[j];
-
-	ANNkd_tree test(buf2d, n, dim);
-	double *searchVal = new double[dim];
-	for (size_t j = 0; j < dim; j++)
-		searchVal[j] = fdb.features[210].data()[j];
-	int k = 5;
-	vector<int> nn_idx(k);
-	vector<double> dd(k);
-	test.annkSearch(searchVal, k, nn_idx.data(), dd.data());
-
-	for (size_t i = 0; i < k; i++)
-		cout << dd[i] << ": " << nn_idx[i] << endl;
-
-	for (size_t i = 0; i < n; i++)
-		delete[] buf2d[i];
-	delete[] buf2d;*/
-
-	if (options.find('w') == options.npos)
+	if (options.find('w') != options.npos)
 	{
 		double best_prec = 0;
 		const int k = 20;
@@ -573,63 +519,67 @@ int main(int argc, char *argv[])
 
 	auto feats = fdb.GetFeatures(ann_weights);
 	CustomMenu menu(feats.data(), fdb.features.size());
-	map<string, pair<double, double>> classPerf;
 
-	for (size_t i = 0; i < numMeshes; i++)
+	if (options.find('s') != options.npos)
 	{
-		auto parent = fdb.meshes[i].parent_path();
-		auto curr_class = parent.string().substr(parent.parent_path().string().size() + 1);
-		int FP = 0, TP = 0;
+		map<string, pair<double, double>> classPerf;
+
+		for (size_t i = 0; i < numMeshes; i++)
+		{
+			auto parent = fdb.meshes[i].parent_path();
+			auto curr_class = parent.string().substr(parent.parent_path().string().size() + 1);
+			int FP = 0, TP = 0;
 #if 1 // ANN
-		vector<int> nn_idx(k_ann);
-		vector<double> dd(k_ann);
-		menu.f_tree.annkSearch(&feats[i * Features::size()], k_ann, nn_idx.data(), dd.data());
-		for (int id : nn_idx)
-		{
-			auto p = fdb.meshes[id].parent_path();
-			auto m_class = p.string().substr(p.parent_path().string().size() + 1);
-			if (curr_class.compare(m_class))
-				FP++;
-			else
-				TP++;
-		}
+			vector<int> nn_idx(k_ann);
+			vector<double> dd(k_ann);
+			menu.f_tree.annkSearch(&feats[i * Features::size()], k_ann, nn_idx.data(), dd.data());
+			for (int id : nn_idx)
+			{
+				auto p = fdb.meshes[id].parent_path();
+				auto m_class = p.string().substr(p.parent_path().string().size() + 1);
+				if (curr_class.compare(m_class))
+					FP++;
+				else
+					TP++;
+			}
 #else
-		auto dists = fdb.CalcDistances(fdb.features[i]);
-		sort(dists.begin(), dists.end());
-		for (size_t i = 0; i < k_us; i++)
-		{
-			auto p = dists[i].second.parent_path();
-			auto m_class = p.string().substr(p.parent_path().string().size() + 1);
-			if (curr_class.compare(m_class))
-				FP++;
-			else
-				TP++;
-		}
+			auto dists = fdb.CalcDistances(fdb.features[i]);
+			sort(dists.begin(), dists.end());
+			for (size_t i = 0; i < k_us; i++)
+			{
+				auto p = dists[i].second.parent_path();
+				auto m_class = p.string().substr(p.parent_path().string().size() + 1);
+				if (curr_class.compare(m_class))
+					FP++;
+				else
+					TP++;
+			}
 #endif
-		int P = ccs[curr_class];
-		classPerf[curr_class].first += double(TP) / P;
-		classPerf[curr_class].second += TP / double(TP + FP);
-	}
+			int P = ccs[curr_class];
+			classPerf[curr_class].first += double(TP) / P;
+			classPerf[curr_class].second += TP / double(TP + FP);
+		}
 
-	double recall = 0, precision = 0;
-	ofstream perf_file(ASSET_PATH "/perf.txt");
-	for (const auto &cs : ccs)
-	{
-		recall += classPerf[cs.first].first;
-		precision += classPerf[cs.first].second;
-		classPerf[cs.first].first /= cs.second;
-		classPerf[cs.first].second /= cs.second;
-		perf_file << cs.first << " " << classPerf[cs.first].first << " "
-				  << classPerf[cs.first].second << endl;
-		cout << cs.first << " " << classPerf[cs.first].first << " " << classPerf[cs.first].second
-			 << endl;
+		double recall = 0, precision = 0;
+		ofstream perf_file(ASSET_PATH "/perf.txt");
+		for (const auto &cs : ccs)
+		{
+			recall += classPerf[cs.first].first;
+			precision += classPerf[cs.first].second;
+			classPerf[cs.first].first /= cs.second;
+			classPerf[cs.first].second /= cs.second;
+			perf_file << cs.first << " " << classPerf[cs.first].first << " "
+					  << classPerf[cs.first].second << endl;
+			cout << cs.first << " " << classPerf[cs.first].first << " "
+				 << classPerf[cs.first].second << endl;
+		}
+		recall /= fdb.features.size();
+		precision /= fdb.features.size();
+		perf_file << "total " << recall << " " << precision << endl;
+		perf_file.close();
+		cout << "Recall over entire database: " << recall << endl
+			 << "Precision over entire database: " << precision << endl;
 	}
-	recall /= fdb.features.size();
-	precision /= fdb.features.size();
-	perf_file << "total " << recall << " " << precision << endl;
-	perf_file.close();
-	cout << "Recall over entire database: " << recall << endl
-		 << "Precision over entire database: " << precision << endl;
 
 	igl::opengl::glfw::Viewer viewer;
 	for (size_t i = 0; i <= pageSize; i++)
@@ -663,7 +613,7 @@ int main(int argc, char *argv[])
 	viewer.plugins.push_back(&menu);
 	viewer.launch();
 
-	if (options.find('s') == options.npos)
+	if (options.find('t') != options.npos)
 	{
 		auto why_you_edit_pointer = fdb.GetFeatures(ann_weights);
 		int out_dim = 2;
