@@ -327,9 +327,10 @@ Features CalcFeatures(const std::shared_ptr<open3d::geometry::TriangleMesh> &mes
 	std::tie(evals, evecs) = ComputeEigenValuesAndVectors(mesh->vertices_);
 	features.eccentricity() = evals(0) / evals(2);
 
+	auto random_engine = std::default_random_engine((unsigned int)std::time(0));
+
 	Histogram<double> A3_hist(0, 0.8 * M_PI, features.A3_size);
-	std::shuffle(mesh->triangles_.begin(), mesh->triangles_.end(),
-				 std::default_random_engine(std::time(0)));
+	std::shuffle(mesh->triangles_.begin(), mesh->triangles_.end(), random_engine);
 	const size_t s_avgV = size_t(avgV);
 	auto A3_sample = mesh->SamplePointsUniformly(s_avgV * 3);
 	std::vector<double> A3_vals(s_avgV);
@@ -345,8 +346,7 @@ Features CalcFeatures(const std::shared_ptr<open3d::geometry::TriangleMesh> &mes
 		features.A3()[i] = norm[i];
 
 	Histogram<double> D1_hist(0, 0.8 * 1.8, features.D1_size);
-	std::shuffle(mesh->triangles_.begin(), mesh->triangles_.end(),
-				 std::default_random_engine(std::time(0)));
+	std::shuffle(mesh->triangles_.begin(), mesh->triangles_.end(), random_engine);
 	auto D1_sample = mesh->SamplePointsUniformly(s_avgV);
 	std::vector<double> D1_vals(s_avgV);
 	std::transform(D1_sample->points_.begin(), D1_sample->points_.end(), D1_vals.begin(),
@@ -357,8 +357,7 @@ Features CalcFeatures(const std::shared_ptr<open3d::geometry::TriangleMesh> &mes
 		features.D1()[i] = norm[i];
 
 	Histogram<double> D2_hist(0, 0.8 * 1.8, features.D2_size);
-	std::shuffle(mesh->triangles_.begin(), mesh->triangles_.end(),
-				 std::default_random_engine(std::time(0)));
+	std::shuffle(mesh->triangles_.begin(), mesh->triangles_.end(), random_engine);
 	auto D2_sample = mesh->SamplePointsUniformly(s_avgV * 2);
 	std::vector<double> D2_vals(s_avgV);
 	for (size_t i = 0; i < s_avgV * 2; i += 2)
@@ -369,8 +368,7 @@ Features CalcFeatures(const std::shared_ptr<open3d::geometry::TriangleMesh> &mes
 		features.D2()[i] = norm[i];
 
 	Histogram<double> D3_hist(0, 0.8 * 0.8, features.D3_size);
-	std::shuffle(mesh->triangles_.begin(), mesh->triangles_.end(),
-				 std::default_random_engine(std::time(0)));
+	std::shuffle(mesh->triangles_.begin(), mesh->triangles_.end(), random_engine);
 	auto D3_sample = mesh->SamplePointsUniformly(s_avgV * 3);
 	std::vector<double> D3_vals(s_avgV);
 	for (size_t i = 0; i < s_avgV * 3; i += 3)
@@ -385,8 +383,7 @@ Features CalcFeatures(const std::shared_ptr<open3d::geometry::TriangleMesh> &mes
 		features.D3()[i] = norm[i];
 
 	Histogram<double> D4_hist(0, 0.8 * 0.6, features.D4_size);
-	std::shuffle(mesh->triangles_.begin(), mesh->triangles_.end(),
-				 std::default_random_engine(std::time(0)));
+	std::shuffle(mesh->triangles_.begin(), mesh->triangles_.end(), random_engine);
 	auto D4_sample = mesh->SamplePointsUniformly(s_avgV * 4);
 	std::vector<double> D4_vals(s_avgV);
 	//(1/6) * dot(cross(AB, AC), AD)
@@ -440,7 +437,7 @@ struct FeatureDatabase
 					const std::vector<std::filesystem::path> &meshes)
 		: features(not_normal), meshes(meshes)
 	{
-		int n = not_normal.size();
+		size_t n = not_normal.size();
 		// Compute Averages
 		for (const auto &f : not_normal)
 		{

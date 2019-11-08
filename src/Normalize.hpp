@@ -19,7 +19,7 @@ void Normalize(const std::shared_ptr<open3d::geometry::TriangleMesh> &mesh)
 	orient.linear() << evecs.transpose();
 	mesh->Transform(orient.matrix());
 
-	float f_x = 0, f_y = 0, f_z = 0;
+	double f_x = 0, f_y = 0, f_z = 0;
 	for (const auto &t : mesh->triangles_)
 	{
 		Eigen::Vector3d centriod =

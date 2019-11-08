@@ -44,7 +44,7 @@ FeatureDatabase fdb;
 MatrixXd V;
 MatrixXi F;
 vector<string> classes;
-map<string, int> ccs;
+map<string, size_t> ccs;
 
 const int scrWidth = 1280, scrHeight = 800;
 const int xStart = 280, yStart = 0;
@@ -171,14 +171,14 @@ class CustomMenu : public igl::opengl::glfw::imgui::ImGuiMenu
 			strs << "distance: " << pages[page][i].first;
 			string str = strs.str();
 			const auto &viewport = viewer->core_list[i + 1].viewport;
-			drawList->AddText(ImGui::GetFont(), ImGui::GetFontSize() * 1.2,
+			drawList->AddText(ImGui::GetFont(), ImGui::GetFontSize() * 1.2f,
 							  ImVec2(viewport[0] + 10, scrHeight - viewport[1] - viewport[3] + 10),
 							  ImGui::GetColorU32(ImVec4(1, 1, 1, 1)), &str[0],
 							  &str[0] + str.size());
 			str = "mesh: " + (pages[page][i].second.parent_path().filename() /
 							  pages[page][i].second.filename())
 								 .string();
-			drawList->AddText(ImGui::GetFont(), ImGui::GetFontSize() * 1.2,
+			drawList->AddText(ImGui::GetFont(), ImGui::GetFontSize() * 1.2f,
 							  ImVec2(viewport[0] + 10, scrHeight - viewport[1] - viewport[3] +
 														   ImGui::GetTextLineHeight() + 10),
 							  ImGui::GetColorU32(ImVec4(1, 1, 1, 1)), &str[0],
@@ -384,7 +384,7 @@ class CustomMenu : public igl::opengl::glfw::imgui::ImGuiMenu
 					{
 						vector<int> nn_idx(numMeshes);
 						vector<double> dd(numMeshes);
-						f_tree.annkSearch(features.data(), numMeshes, nn_idx.data(), dd.data());
+						f_tree.annkSearch(features.data(), int(numMeshes), nn_idx.data(), dd.data());
 						for (size_t i = 0; i < numMeshes; i++)
 						{
 							if (dd[i] > r_ann)
@@ -413,10 +413,10 @@ class CustomMenu : public igl::opengl::glfw::imgui::ImGuiMenu
 
 					if (curr_class)
 					{
-						int P = ccs[string(curr_class)];
-						int N = numMeshes - P;
-						int TN = N - FP;
-						int FN = P - TP;
+						size_t P = ccs[string(curr_class)];
+						size_t N = numMeshes - P;
+						size_t TN = N - FP;
+						size_t FN = P - TP;
 
 						cout << "Class: " << curr_class << endl
 							 << "Class size: " << P << endl
@@ -520,7 +520,7 @@ int main(int argc, char *argv[])
 		auto mesh_class = parent.string().substr(parent.parent_path().string().size() + 1);
 		ccs[mesh_class]++;
 	}
-	for (map<string, int>::iterator it = ccs.begin(); it != ccs.end(); ++it)
+	for (auto it = ccs.begin(); it != ccs.end(); ++it)
 		classes.push_back(it->first);
 
 	if (options.find('w') != options.npos)
@@ -536,7 +536,7 @@ int main(int argc, char *argv[])
 						{
 							vector<int> curr_weights({i1, i2, i3, i4, i5, i6, i7, i8, i9, i10});
 							auto w_feat = fdb.GetWeightedFeatures(curr_weights);
-							CustomMenu menu(w_feat.data(), numMeshes);
+							CustomMenu menu(w_feat.data(), int(numMeshes));
 							double precision = 0;
 							for (size_t i = 0; i < numMeshes; i++)
 							{
@@ -583,7 +583,7 @@ int main(int argc, char *argv[])
 	fdb.WeightFeatures(ann_weights);
 
 	auto feats = fdb.GetFeatureVectors();
-	CustomMenu menu(feats.data(), fdb.features.size());
+	CustomMenu menu(feats.data(), int(fdb.features.size()));
 
 	if (options.find('s') != options.npos)
 	{
@@ -620,7 +620,7 @@ int main(int argc, char *argv[])
 					TP++;
 			}
 #endif
-			int P = ccs[curr_class];
+			size_t P = ccs[curr_class];
 			classPerf[curr_class].first += double(TP) / P;
 			classPerf[curr_class].second += TP / double(TP + FP);
 		}
@@ -654,8 +654,8 @@ int main(int argc, char *argv[])
 		const int xCount = int(ceil(pageSize / 3.0));
 		const int yCount = 3;
 		assert(xCount * yCount <= 31);
-		const int cellWidth = (scrWidth - xStart) / xCount;
-		const int cellHeight = (scrHeight - yStart) / yCount;
+		const float cellWidth = float((scrWidth - xStart) / xCount);
+		const float cellHeight = float((scrHeight - yStart) / yCount);
 		viewer.core().viewport = Vector4f(0, 0, scrWidth, scrHeight);
 		for (size_t j = 1; j <= 3; j++)
 			for (size_t i = 0; i < ceil(pageSize / 3.0); i++)
@@ -681,10 +681,10 @@ int main(int argc, char *argv[])
 	if (options.find('t') != options.npos)
 	{
 		auto why_you_edit_pointer = fdb.GetFeatureVectors();
-		int out_dim = 2;
+		size_t out_dim = 2;
 		double *out_vec = (double *)malloc(numMeshes * out_dim * sizeof(double));
 		double *costs = (double *)calloc(numMeshes, sizeof(double));
-		TSNE::run(why_you_edit_pointer.data(), numMeshes, Features::size(), out_vec, out_dim, 50,
+		TSNE::run(why_you_edit_pointer.data(), int(numMeshes), Features::size(), out_vec, int(out_dim), 50,
 				  0.5, 1, false, 1000, 250, 250);
 		ofstream tsne_file(ASSET_PATH "/tsne.txt");
 		for (size_t i = 0; i < numMeshes; i++)

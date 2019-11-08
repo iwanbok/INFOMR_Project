@@ -10,14 +10,14 @@ std::vector<std::string> exts = {".off", ".ply", ".stl"};
 
 int lowerBoundF = 15000, targetF = 20000, upperBoundF = 25000;
 float avgV = 0, avgF = 0;
-int minV = INT_MAX, maxV = 0, minF = INT_MAX, maxF = 0, numMeshes = 0;
+size_t minV = SIZE_MAX, maxV = 0, minF = SIZE_MAX, maxF = 0, numMeshes = 0;
 void CalcMeshStatistics(const std::vector<std::filesystem::path> &files)
 {
 	avgV = 0;
 	avgF = 0;
-	minV = INT_MAX;
+	minV = SIZE_MAX;
 	maxV = 0;
-	minF = INT_MAX;
+	minF = SIZE_MAX;
 	maxF = 0;
 	numMeshes = 0;
 	for (auto &f : files)
@@ -25,12 +25,12 @@ void CalcMeshStatistics(const std::vector<std::filesystem::path> &files)
 		{
 			auto mesh = open3d::io::CreateMeshFromFile(f.string());
 
-			int v_count = mesh->vertices_.size();
+			size_t v_count = mesh->vertices_.size();
 			avgV += v_count;
 			minV = std::min(minV, v_count);
 			maxV = std::max(maxV, v_count);
 
-			int f_count = mesh->triangles_.size();
+			size_t f_count = mesh->triangles_.size();
 			avgF += f_count;
 			minF = std::min(minF, f_count);
 			maxF = std::max(maxF, f_count);
@@ -42,13 +42,15 @@ void CalcMeshStatistics(const std::vector<std::filesystem::path> &files)
 	targetF = int(avgF);
 	lowerBoundF = int(avgF * 0.75f);
 	upperBoundF = int(avgF * 1.25f);
-	printf("# of Vertices:\n\tAvg: %.2f\n\tMin: %i\n\tMax:%i\n# of Faces:\n\tAvg: %.2f\n\tMin: "
-		   "%i\n\tMax: %i\n",
+	printf("# of Vertices:\n\tAvg: %.2f\n\tMin: %zu\n\tMax:%zu\n# of Faces:\n\tAvg: %.2f\n\tMin: "
+		   "%zu\n\tMax: %zu\n",
 		   avgV, minV, maxV, avgF, minF, maxF);
 }
 
-template <typename T> int sgn(T val) {
-    return (T(0) < val) - (val < T(0));
+template <typename T>
+int sgn(T val)
+{
+	return (T(0) < val) - (val < T(0));
 }
 
 std::string GetCmdOptions(int argc, char **argv)
