@@ -22,6 +22,7 @@
 #include <fstream>
 #include <iostream>
 #include <map>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -96,10 +97,7 @@ class CustomMenu : public igl::opengl::glfw::imgui::ImGuiMenu
 			if (i >= pages[page].size())
 				continue;
 			viewer->data_list[i + 1].set_visible(true, viewer->core_list[i + 1].id);
-			int dist;
-			filesystem::path mesh;
-			tie(dist, mesh) = pages[page][i];
-			igl::read_triangle_mesh(mesh.string(), V, F);
+			igl::read_triangle_mesh(pages[page][i].second.string(), V, F);
 			viewer->data_list[i + 1].set_mesh(V, F);
 
 			// Resetting camera parameters
@@ -124,6 +122,71 @@ class CustomMenu : public igl::opengl::glfw::imgui::ImGuiMenu
 				TP++;
 		}
 		cout << d.first << ": " << d.second << endl;
+	}
+
+	virtual void draw_menu() override
+	{
+		// Text labels
+		draw_labels_window();
+		if (page < pages.size())
+			draw_custom_lables();
+
+		// Viewer settings
+		if (callback_draw_viewer_window)
+		{
+			callback_draw_viewer_window();
+		}
+		else
+		{
+			draw_viewer_window();
+		}
+
+		// Other windows
+		if (callback_draw_custom_window)
+		{
+			callback_draw_custom_window();
+		}
+		else
+		{
+			draw_custom_window();
+		}
+	}
+
+	void draw_custom_lables()
+	{
+		ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiSetCond_Always);
+		ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize, ImGuiSetCond_Always);
+		bool visible = true;
+		ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0, 0, 0, 0));
+		ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0);
+		ImGui::Begin("CustomLabels", &visible,
+					 ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+						 ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar |
+						 ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoCollapse |
+						 ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoInputs);
+		ImDrawList *drawList = ImGui::GetWindowDrawList();
+		for (size_t i = 0; i < pages[page].size(); i++)
+		{
+			ostringstream strs;
+			strs << "distance: " << pages[page][i].first;
+			string str = strs.str();
+			const auto &viewport = viewer->core_list[i + 1].viewport;
+			drawList->AddText(ImGui::GetFont(), ImGui::GetFontSize() * 1.2,
+							  ImVec2(viewport[0] + 10, scrHeight - viewport[1] - viewport[3] + 10),
+							  ImGui::GetColorU32(ImVec4(1, 1, 1, 1)), &str[0],
+							  &str[0] + str.size());
+			str = "mesh: " + (pages[page][i].second.parent_path().filename() /
+							pages[page][i].second.filename())
+							   .string();
+			drawList->AddText(ImGui::GetFont(), ImGui::GetFontSize() * 1.2,
+							  ImVec2(viewport[0] + 10, scrHeight - viewport[1] - viewport[3] +
+														   ImGui::GetTextLineHeight() + 10),
+							  ImGui::GetColorU32(ImVec4(1, 1, 1, 1)), &str[0],
+							  &str[0] + str.size());
+		}
+		ImGui::End();
+		ImGui::PopStyleColor();
+		ImGui::PopStyleVar();
 	}
 
 	virtual void draw_viewer_menu() override
