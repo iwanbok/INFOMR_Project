@@ -9,73 +9,30 @@
 #include "emd/emd.h"
 
 #include "Open3D/Geometry/BoundingVolume.h"
-#include "Open3D/IO/TriangleMeshIO.h"
+#include "Open3D/Geometry/TriangleMesh.h"
 
 #include "EigenVectors.hpp"
+#include "Histogram.hpp"
 #include "Utils.hpp"
 
-/// Basic histogram that can count items in bins and normalize this. Type T needs to support
-/// operator<(T, T), operator+(T, T), operator*(T, size_t) and operator/(T, size_t)
-template <typename T>
-class Histogram
-{
-  private:
-	std::vector<int> bins;
-	T minVal, maxVal, binSize;
-	size_t binCount;
-
-  public:
-	Histogram(T minVal, T maxVal, size_t binCount)
-		: minVal(minVal), maxVal(maxVal), binSize((maxVal - minVal) / binCount), binCount(binCount),
-		  bins(binCount)
-	{
-	}
-
-	/// Returns the normalized histogram
-	std::vector<double> Normalized()
-	{
-		int total = std::accumulate(bins.begin(), bins.end(), 0);
-		if (!total)
-			return std::vector<double>(binCount);
-		std::vector<double> normalized(binCount);
-		std::transform(bins.begin(), bins.end(), normalized.begin(),
-					   std::bind(std::multiplies<double>(), std::placeholders::_1, 1.0 / total));
-		return normalized;
-	}
-
-	/// Adds items into the histogram anything less then the minVal or greater then maxVal will be
-	/// discarded
-	void AddToHistogram(std::vector<T> &items)
-	{
-		std::sort(items.begin(), items.end());
-		auto iter = items.begin();
-		while (*iter < minVal)
-			iter++;
-		for (size_t i = 0; i < binCount; i++)
-			while (*iter < minVal + binSize * (i + 1))
-			{
-				bins[i]++;
-				if (++iter == items.end())
-					return;
-			}
-		if (iter != items.end())
-			std::cout << "[WARNING] values exceed histogram range" << std::endl;
-	}
-};
-
+/// Struct representing a single mesh's feature vector
 struct Features
 {
   private:
+	/// internal storage for feature values
 	std::vector<double> values;
 
   public:
+	/// Constant variables for bins counts of the historgrams
 	const static int A3_size = 10, D1_size = 10, D2_size = 10, D3_size = 10, D4_size = 10;
 
+	/// Total size of the feature vector
 	static int size()
 	{
 		return 5 + A3_size + D1_size + D2_size + D3_size + D4_size;
 	}
 
+	/// Returns the index in the weights vector based on data index(in values vector)
 	static int weightIndex(int dataIdx)
 	{
 		if (dataIdx < 5)
@@ -92,10 +49,13 @@ struct Features
 			return 9;
 	}
 
+	/// Pointer to feature data.
 	double *data()
 	{
 		return values.data();
 	}
+
+	/// Reference to surface area feature
 	double &surface_area()
 	{
 		return values[0];
@@ -104,6 +64,8 @@ struct Features
 	{
 		return values[0];
 	}
+
+	/// Reference to compactness feature
 	double &compactness()
 	{
 		return values[1];
@@ -112,6 +74,8 @@ struct Features
 	{
 		return values[1];
 	}
+
+	/// Reference to axis aligned bounding box volume feature
 	double &aabbV()
 	{
 		return values[2];
@@ -120,6 +84,8 @@ struct Features
 	{
 		return values[2];
 	}
+
+	/// Reference to diameter feature
 	double &diameter()
 	{
 		return values[3];
@@ -128,6 +94,8 @@ struct Features
 	{
 		return values[3];
 	}
+
+	/// Reference to eccentricity feature
 	double &eccentricity()
 	{
 		return values[4];
@@ -137,6 +105,7 @@ struct Features
 		return values[4];
 	}
 
+	/// Pointer to start of A3 histogram
 	double *A3()
 	{
 		return &values[5];
@@ -145,6 +114,8 @@ struct Features
 	{
 		return &values[5];
 	}
+
+	/// Pointer to start of D1 histogram
 	double *D1()
 	{
 		return &values[5 + A3_size];
@@ -153,6 +124,8 @@ struct Features
 	{
 		return &values[5 + A3_size];
 	}
+
+	/// Pointer to start of D2 histogram
 	double *D2()
 	{
 		return &values[5 + A3_size + D1_size];
@@ -161,6 +134,8 @@ struct Features
 	{
 		return &values[5 + A3_size + D1_size];
 	}
+
+	/// Pointer to start of D3 histogram
 	double *D3()
 	{
 		return &values[5 + A3_size + D1_size + D2_size];
@@ -169,6 +144,8 @@ struct Features
 	{
 		return &values[5 + A3_size + D1_size + D2_size];
 	}
+
+	/// Pointer to start of D4 histogram
 	double *D4()
 	{
 		return &values[5 + A3_size + D1_size + D2_size + D3_size];
@@ -189,11 +166,117 @@ struct Features
 	{
 	}
 
-	Features(const double *vals) : values(5 + A3_size + D1_size + D2_size + D3_size + D4_size)
+	/// Calculates the feature vector for the provided mesh
+	Features(const std::shared_ptr<open3d::geometry::TriangleMesh> &mesh)
+		: values(5 + A3_size + D1_size + D2_size + D3_size + D4_size)
 	{
-		std::memcpy(values.data(), vals, values.size());
+		surface_area() = mesh->GetSurfaceArea();
+
+		// singed volume of a tetrahedra OABC given OA, OB and OC: V = (1/6) * dot(cross(OA, OB),
+		// OC) Volume of a mesh is the sum of the signed volumes of tetrahedra contructed by its
+		// triangles and the origin.
+		double volume =
+			std::accumulate(mesh->triangles_.begin(), mesh->triangles_.end(), 0.0,
+							[=](double curr, const Eigen::Vector3i &t) {
+								return curr + (1.0 / 6.0) * mesh->vertices_[t(0)]
+																.cross(mesh->vertices_[t(1)])
+																.dot(mesh->vertices_[t(2)]);
+							});
+
+		compactness() = std::cbrt(36 * M_PI * volume * volume) / surface_area();
+
+		aabbV() = mesh->GetAxisAlignedBoundingBox().Volume();
+
+		diameter() = std::sqrt(std::accumulate(
+			mesh->vertices_.begin(), mesh->vertices_.end(), 0.0,
+			[mesh](double mesh_max, const Eigen::Vector3d &v0) {
+				return std::max(mesh_max,
+								std::accumulate(mesh->vertices_.begin(), mesh->vertices_.end(), 0.0,
+												[v0](double vert_max, const Eigen::Vector3d &v1) {
+													return std::max(vert_max,
+																	(v1 - v0).squaredNorm());
+												}));
+			}));
+
+		Eigen::Matrix3d evecs;
+		Eigen::Vector3d evals;
+		std::tie(evals, evecs) = ComputeEigenValuesAndVectors(mesh->vertices_);
+		eccentricity() = evals(0) / evals(2);
+
+		auto random_engine = std::default_random_engine((unsigned int)std::time(0));
+
+		Histogram<double> A3_hist(0, 0.8 * M_PI, A3_size);
+		std::shuffle(mesh->triangles_.begin(), mesh->triangles_.end(), random_engine);
+		const size_t s_avgV = size_t(avgV);
+		auto A3_sample = mesh->SamplePointsUniformly(s_avgV * 3);
+		std::vector<double> A3_vals(s_avgV);
+		for (size_t i = 0; i < s_avgV * 3; i += 3)
+		{
+			auto nv_ab = (A3_sample->points_[i + 1] - A3_sample->points_[i]).normalized();
+			auto nv_ac = (A3_sample->points_[i + 2] - A3_sample->points_[i]).normalized();
+			A3_vals[i / 3] = nv_ab.dot(nv_ac);
+		}
+		A3_hist.AddToHistogram(A3_vals);
+		auto norm = A3_hist.Normalized();
+		for (size_t i = 0; i < A3_size; i++)
+			A3()[i] = norm[i];
+
+		Histogram<double> D1_hist(0, 0.8 * 1.8, D1_size);
+		std::shuffle(mesh->triangles_.begin(), mesh->triangles_.end(), random_engine);
+		auto D1_sample = mesh->SamplePointsUniformly(s_avgV);
+		std::vector<double> D1_vals(s_avgV);
+		std::transform(D1_sample->points_.begin(), D1_sample->points_.end(), D1_vals.begin(),
+					   [mesh](const Eigen::Vector3d &p) { return (mesh->GetCenter() - p).norm(); });
+		D1_hist.AddToHistogram(D1_vals);
+		norm = D1_hist.Normalized();
+		for (size_t i = 0; i < D1_size; i++)
+			D1()[i] = norm[i];
+
+		Histogram<double> D2_hist(0, 0.8 * 1.8, D2_size);
+		std::shuffle(mesh->triangles_.begin(), mesh->triangles_.end(), random_engine);
+		auto D2_sample = mesh->SamplePointsUniformly(s_avgV * 2);
+		std::vector<double> D2_vals(s_avgV);
+		for (size_t i = 0; i < s_avgV * 2; i += 2)
+			D2_vals[i / 2] = (D2_sample->points_[i] - D2_sample->points_[i + 1]).norm();
+		D2_hist.AddToHistogram(D2_vals);
+		norm = D2_hist.Normalized();
+		for (size_t i = 0; i < D2_size; i++)
+			D2()[i] = norm[i];
+
+		Histogram<double> D3_hist(0, 0.8 * 0.8, D3_size);
+		std::shuffle(mesh->triangles_.begin(), mesh->triangles_.end(), random_engine);
+		auto D3_sample = mesh->SamplePointsUniformly(s_avgV * 3);
+		std::vector<double> D3_vals(s_avgV);
+		for (size_t i = 0; i < s_avgV * 3; i += 3)
+		{
+			auto v_ab = D3_sample->points_[i + 1] - D3_sample->points_[i];
+			auto v_ac = D3_sample->points_[i + 2] - D3_sample->points_[i];
+			D3_vals[i / 3] = std::sqrt((1.0 / 2.0) * v_ab.cross(v_ac).norm());
+		}
+		D3_hist.AddToHistogram(D3_vals);
+		norm = D3_hist.Normalized();
+		for (size_t i = 0; i < D3_size; i++)
+			D3()[i] = norm[i];
+
+		Histogram<double> D4_hist(0, 0.8 * 0.6, D4_size);
+		std::shuffle(mesh->triangles_.begin(), mesh->triangles_.end(), random_engine);
+		auto D4_sample = mesh->SamplePointsUniformly(s_avgV * 4);
+		std::vector<double> D4_vals(s_avgV);
+		//(1/6) * dot(cross(AB, AC), AD)
+		for (size_t i = 0; i < s_avgV * 4; i += 4)
+		{
+			auto v_ab = D4_sample->points_[i + 1] - D4_sample->points_[i];
+			auto v_ac = D4_sample->points_[i + 2] - D4_sample->points_[i];
+			auto v_ad = D4_sample->points_[i + 3] - D4_sample->points_[i];
+			D4_vals[i / 4] = std::cbrt((1.0 / 6.0) * std::abs(v_ab.cross(v_ac).dot(v_ad)));
+		}
+		D4_hist.AddToHistogram(D4_vals);
+		norm = D4_hist.Normalized();
+		for (size_t i = 0; i < D4_size; i++)
+			D4()[i] = norm[i];
 	}
 
+	/// Reads a feature vector from a given file
 	void ReadFromFile(const std::filesystem::path &file)
 	{
 		std::ifstream in(file);
@@ -210,9 +293,11 @@ struct Features
 			in >> D4()[i];
 	}
 
+	/// Calculates the distance between this feature vector and another via a compile time constant
+	/// set method.
 	double Distance(Features other)
 	{
-#if 0 // EMD + L2
+#ifdef EMD // EMD + L2
 		const Eigen::VectorXf weights = Eigen::VectorXf::Constant(A3_size, 1);
 		auto dist = [](const feature_t *left, const feature_t *right) {
 			return float(std::abs(*left - *right));
@@ -245,27 +330,29 @@ struct Features
 
 		auto glob_dist = (feature_1 - feature_2).cwiseAbs2();
 		
-		return glob_dist.sum() + A3_dist + D1_dist + D2_dist + D3_dist + D4_dist;
+		return std::sqrt(glob_dist.sum()) + A3_dist + D1_dist + D2_dist + D3_dist + D4_dist;
 
 #else
 		Eigen::Matrix<double, 55, 1> l(data());
 		Eigen::Matrix<double, 55, 1> r(other.data());
-#if 0 // L2
-		return (l - r).cwiseAbs2().sum();
-#else // L1
+ #ifdef L2  // L2
+		return std::sqrt((l - r).cwiseAbs2().sum());
+ #else      // L1
 		return (l - r).cwiseAbs().sum();
-#endif
-#endif
+ #endif L2
+#endif EMD
 	}
 
+	/// Weight this feature vector with provided weights
 	template <typename T>
 	void WeightFeatures(const std::vector<T> &weights)
 	{
-		for (size_t i = 0; i < size(); i++)
+		for (int i = 0; i < size(); i++)
 			values[i] *= weights[weightIndex(i)];
 	}
 };
 
+/// Ostream push operator for Features class
 std::ostream &operator<<(std::ostream &o, const Features &a)
 {
 	o << a.surface_area() << std::endl
@@ -289,283 +376,4 @@ std::ostream &operator<<(std::ostream &o, const Features &a)
 		o << a.D4()[i] << " ";
 	o << std::endl;
 	return o;
-}
-
-Features CalcFeatures(const std::shared_ptr<open3d::geometry::TriangleMesh> &mesh)
-{
-	Features features;
-
-	features.surface_area() = mesh->GetSurfaceArea();
-
-	// singed volume of a tetrahedra OABC given OA, OB and OC: V = (1/6) * dot(cross(OA, OB), OC)
-	// Volume of a mesh is the sum of the signed volumes of tetrahedra contructed by its triangles
-	// and the origin.
-	double volume =
-		std::accumulate(mesh->triangles_.begin(), mesh->triangles_.end(), 0.0,
-						[=](double curr, const Eigen::Vector3i &t) {
-							return curr + (1.0 / 6.0) * mesh->vertices_[t(0)]
-															.cross(mesh->vertices_[t(1)])
-															.dot(mesh->vertices_[t(2)]);
-						});
-
-	features.compactness() = std::cbrt(36 * M_PI * volume * volume) / features.surface_area();
-
-	features.aabbV() = mesh->GetAxisAlignedBoundingBox().Volume();
-
-	features.diameter() = std::sqrt(std::accumulate(
-		mesh->vertices_.begin(), mesh->vertices_.end(), 0.0,
-		[mesh](double mesh_max, const Eigen::Vector3d &v0) {
-			return std::max(mesh_max,
-							std::accumulate(mesh->vertices_.begin(), mesh->vertices_.end(), 0.0,
-											[v0](double vert_max, const Eigen::Vector3d &v1) {
-												return std::max(vert_max, (v1 - v0).squaredNorm());
-											}));
-		}));
-
-	Eigen::Matrix3d evecs;
-	Eigen::Vector3d evals;
-	std::tie(evals, evecs) = ComputeEigenValuesAndVectors(mesh->vertices_);
-	features.eccentricity() = evals(0) / evals(2);
-
-	auto random_engine = std::default_random_engine((unsigned int)std::time(0));
-
-	Histogram<double> A3_hist(0, 0.8 * M_PI, features.A3_size);
-	std::shuffle(mesh->triangles_.begin(), mesh->triangles_.end(), random_engine);
-	const size_t s_avgV = size_t(avgV);
-	auto A3_sample = mesh->SamplePointsUniformly(s_avgV * 3);
-	std::vector<double> A3_vals(s_avgV);
-	for (size_t i = 0; i < s_avgV * 3; i += 3)
-	{
-		auto nv_ab = (A3_sample->points_[i + 1] - A3_sample->points_[i]).normalized();
-		auto nv_ac = (A3_sample->points_[i + 2] - A3_sample->points_[i]).normalized();
-		A3_vals[i / 3] = nv_ab.dot(nv_ac);
-	}
-	A3_hist.AddToHistogram(A3_vals);
-	auto norm = A3_hist.Normalized();
-	for (size_t i = 0; i < features.A3_size; i++)
-		features.A3()[i] = norm[i];
-
-	Histogram<double> D1_hist(0, 0.8 * 1.8, features.D1_size);
-	std::shuffle(mesh->triangles_.begin(), mesh->triangles_.end(), random_engine);
-	auto D1_sample = mesh->SamplePointsUniformly(s_avgV);
-	std::vector<double> D1_vals(s_avgV);
-	std::transform(D1_sample->points_.begin(), D1_sample->points_.end(), D1_vals.begin(),
-				   [mesh](const Eigen::Vector3d &p) { return (mesh->GetCenter() - p).norm(); });
-	D1_hist.AddToHistogram(D1_vals);
-	norm = D1_hist.Normalized();
-	for (size_t i = 0; i < features.D1_size; i++)
-		features.D1()[i] = norm[i];
-
-	Histogram<double> D2_hist(0, 0.8 * 1.8, features.D2_size);
-	std::shuffle(mesh->triangles_.begin(), mesh->triangles_.end(), random_engine);
-	auto D2_sample = mesh->SamplePointsUniformly(s_avgV * 2);
-	std::vector<double> D2_vals(s_avgV);
-	for (size_t i = 0; i < s_avgV * 2; i += 2)
-		D2_vals[i / 2] = (D2_sample->points_[i] - D2_sample->points_[i + 1]).norm();
-	D2_hist.AddToHistogram(D2_vals);
-	norm = D2_hist.Normalized();
-	for (size_t i = 0; i < features.D2_size; i++)
-		features.D2()[i] = norm[i];
-
-	Histogram<double> D3_hist(0, 0.8 * 0.8, features.D3_size);
-	std::shuffle(mesh->triangles_.begin(), mesh->triangles_.end(), random_engine);
-	auto D3_sample = mesh->SamplePointsUniformly(s_avgV * 3);
-	std::vector<double> D3_vals(s_avgV);
-	for (size_t i = 0; i < s_avgV * 3; i += 3)
-	{
-		auto v_ab = D3_sample->points_[i + 1] - D3_sample->points_[i];
-		auto v_ac = D3_sample->points_[i + 2] - D3_sample->points_[i];
-		D3_vals[i / 3] = std::sqrt((1.0 / 2.0) * v_ab.cross(v_ac).norm());
-	}
-	D3_hist.AddToHistogram(D3_vals);
-	norm = D3_hist.Normalized();
-	for (size_t i = 0; i < features.D3_size; i++)
-		features.D3()[i] = norm[i];
-
-	Histogram<double> D4_hist(0, 0.8 * 0.6, features.D4_size);
-	std::shuffle(mesh->triangles_.begin(), mesh->triangles_.end(), random_engine);
-	auto D4_sample = mesh->SamplePointsUniformly(s_avgV * 4);
-	std::vector<double> D4_vals(s_avgV);
-	//(1/6) * dot(cross(AB, AC), AD)
-	for (size_t i = 0; i < s_avgV * 4; i += 4)
-	{
-		auto v_ab = D4_sample->points_[i + 1] - D4_sample->points_[i];
-		auto v_ac = D4_sample->points_[i + 2] - D4_sample->points_[i];
-		auto v_ad = D4_sample->points_[i + 3] - D4_sample->points_[i];
-		D4_vals[i / 4] = std::cbrt((1.0 / 6.0) * std::abs(v_ab.cross(v_ac).dot(v_ad)));
-	}
-	D4_hist.AddToHistogram(D4_vals);
-	norm = D4_hist.Normalized();
-	for (size_t i = 0; i < features.D4_size; i++)
-		features.D4()[i] = norm[i];
-
-	return features;
-}
-
-// Struct containing normalized feature vectors
-struct FeatureDatabase
-{
-	std::vector<Features> features;
-	std::vector<std::filesystem::path> meshes;
-	double surface_area_avg, compactness_avg, aabbV_avg, diameter_avg, eccentricity_avg;
-	double surface_area_stddev, compactness_stddev, aabbV_stddev, diameter_stddev,
-		eccentricity_stddev;
-
-	FeatureDatabase()
-	{
-	}
-
-	FeatureDatabase(const std::string &db_dir)
-	{
-		auto files = getAllFilesInDir(db_dir);
-		std::sort(files.begin(), files.end(), std::greater<std::filesystem::path>());
-		std::ifstream in(files[0]);
-		in >> surface_area_avg >> surface_area_stddev >> compactness_stddev >> compactness_avg >>
-			aabbV_avg >> aabbV_stddev >> diameter_avg >> diameter_stddev >> eccentricity_avg >>
-			eccentricity_stddev >> lowerBoundF >> targetF >> upperBoundF >> avgV >> avgF >> minV >>
-			maxV >> minF >> maxF >> numMeshes;
-		in.close();
-		features = std::vector<Features>(files.size() - 1);
-		for (size_t i = 1; i < files.size(); i++)
-			features[i - 1].ReadFromFile(files[i]);
-		meshes = std::vector<std::filesystem::path>(files.size() - 1);
-		for (size_t i = 1; i < files.size(); i++)
-			meshes[i - 1] = replaceDir(files[i], ORIGINAL_DIR).replace_extension(".off");
-	}
-
-	FeatureDatabase(const std::vector<Features> &not_normal,
-					const std::vector<std::filesystem::path> &meshes)
-		: features(not_normal), meshes(meshes)
-	{
-		size_t n = not_normal.size();
-		// Compute Averages
-		for (const auto &f : not_normal)
-		{
-			surface_area_avg += f.surface_area() / n;
-			compactness_avg += f.compactness() / n;
-			aabbV_avg += f.aabbV() / n;
-			diameter_avg += f.diameter() / n;
-			eccentricity_avg += f.eccentricity() / n;
-		}
-
-		// Compute standard deviations
-		// First accumulate squared mean distance
-		for (const auto &f : not_normal)
-		{
-			double diff = f.surface_area() - surface_area_avg;
-			surface_area_stddev += diff * diff;
-			diff = f.compactness() - compactness_avg;
-			compactness_stddev += diff * diff;
-			diff = f.aabbV() - aabbV_avg;
-			aabbV_stddev += diff * diff;
-			diff = f.diameter() - diameter_avg;
-			diameter_stddev += diff * diff;
-			diff = f.eccentricity() - eccentricity_avg;
-			eccentricity_stddev += diff * diff;
-		}
-		// Secondly compute actual standard deviation
-		surface_area_stddev = std::sqrt(surface_area_stddev / (n - 1));
-		compactness_stddev = std::sqrt(compactness_stddev / (n - 1));
-		aabbV_stddev = std::sqrt(aabbV_stddev / (n - 1));
-		diameter_stddev = std::sqrt(diameter_stddev / (n - 1));
-		eccentricity_stddev = std::sqrt(eccentricity_stddev / (n - 1));
-
-		// Normalize Features
-		for (auto &f : features)
-			NormalizeFeatures(f);
-	}
-
-	void NormalizeFeatures(Features &f)
-	{
-		f.surface_area() = (f.surface_area() - surface_area_avg) / (2 * surface_area_stddev);
-		f.compactness() = (f.compactness() - compactness_avg) / (2 * compactness_stddev);
-		f.aabbV() = (f.aabbV() - aabbV_avg) / (2 * aabbV_stddev);
-		f.diameter() = (f.diameter() - diameter_avg) / (2 * diameter_stddev);
-		f.eccentricity() = (f.eccentricity() - eccentricity_avg) / (2 * eccentricity_stddev);
-	}
-
-	void WriteDatabaseInfo(const std::filesystem::path &path)
-	{
-		std::ofstream out(path);
-		out << surface_area_avg << std::endl
-			<< surface_area_stddev << std::endl
-			<< compactness_stddev << std::endl
-			<< compactness_avg << std::endl
-			<< aabbV_avg << std::endl
-			<< aabbV_stddev << std::endl
-			<< diameter_avg << std::endl
-			<< diameter_stddev << std::endl
-			<< eccentricity_avg << std::endl
-			<< eccentricity_stddev << std::endl
-			<< lowerBoundF << std::endl
-			<< targetF << std::endl
-			<< upperBoundF << std::endl
-			<< avgV << std::endl
-			<< avgF << std::endl
-			<< minV << std::endl
-			<< maxV << std::endl
-			<< minF << std::endl
-			<< maxF << std::endl
-			<< numMeshes << std::endl;
-		out.close();
-	}
-
-	std::vector<std::pair<double, std::filesystem::path>> CalcDistances(const Features &f)
-	{
-		std::vector<std::pair<double, std::filesystem::path>> distances(features.size());
-		for (size_t i = 0; i < features.size(); i++)
-			distances[i] = std::make_pair(features[i].Distance(f), meshes[i]);
-		return distances;
-	}
-
-	template <typename T>
-	void WeightFeatures(const std::vector<T> &weights)
-	{
-		for (auto &f : features)
-			f.WeightFeatures(weights);
-	}
-
-	template <typename T>
-	std::vector<double> GetWeightedFeatures(const std::vector<T> &weights)
-	{
-		std::vector<double> res(numMeshes * Features::size());
-		for (size_t i = 0; i < numMeshes; i++)
-			for (size_t j = 0; j < Features::size(); j++)
-				res[i * Features::size() + j] =
-					weights[Features::weightIndex(j)] * features[i].data()[j];
-		return res;
-	}
-
-	std::vector<double> GetFeatureVectors()
-	{
-		std::vector<double> res(numMeshes * Features::size());
-		for (size_t i = 0; i < numMeshes; i++)
-			for (size_t j = 0; j < Features::size(); j++)
-				res[i * Features::size() + j] = features[i].data()[j];
-		return res;
-	}
-};
-
-FeatureDatabase CalculateFeaturesMeshDatabase(const std::vector<std::filesystem::path> &files)
-{
-	std::vector<Features> features(files.size());
-	for (size_t i = 0; i < files.size(); i++)
-	{
-		auto mesh = open3d::io::CreateMeshFromFile(files[i].string());
-		features[i] = CalcFeatures(mesh);
-	}
-	std::vector<std::filesystem::path> originals(files.size());
-	for (size_t i = 0; i < files.size(); i++)
-		originals[i] = replaceDir(files[i], ORIGINAL_DIR);
-
-	FeatureDatabase fdb(features, originals);
-
-	fdb.WriteDatabaseInfo(FEATURE_DIR "/db_info.fdb");
-	for (size_t i = 0; i < files.size(); i++)
-	{
-		std::ofstream out(replaceDir(files[i], FEATURE_DIR).replace_extension(".features"));
-		out << fdb.features[i];
-		out.close();
-	}
-	return fdb;
 }

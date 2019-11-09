@@ -68,6 +68,6 @@
         "eigenvalues": "cpp",
         "alignedvector3": "cpp"
     },
-    "python.pythonPath": "C:\\ProgramData\\Anaconda3\\python.exe",
+    "python.pythonPath": "C:\\Program Files\\Python37\\python.exe",
     "python.formatting.provider": "yapf"
 }

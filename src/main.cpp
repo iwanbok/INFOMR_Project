@@ -2,11 +2,19 @@
 #define ASSET_PATH "data/"
 #endif
 
+// #define L2        // UNCOMMENT FOR L2 Distance metric
+// #define EMD       // UNCOMMENT FOR EMD Distance metric (does not work in ANN, overides L2 in Custom metric case)
+#define ANN_STATS // COMMENT FOR USING CUSTOM METRICS FOR STATS
 #define ORIGINAL_DIR ASSET_PATH "LabeledDB_new"
 #define PREPROCESSED_DIR ASSET_PATH "preprocessed"
 #define NORMALIZED_DIR ASSET_PATH "normalized"
 #define FEATURE_DIR ASSET_PATH "features"
 #define INFO_DIR ASSET_PATH "info"
+#ifdef L2
+#define WEIGHTS_FILE ASSET_PATH "weights - L2.txt"
+#else
+#define WEIGHTS_FILE ASSET_PATH "weights - L1.txt"
+#endif
 
 #include <igl/opengl/MeshGL.h>
 #include <igl/opengl/glfw/Viewer.h>
@@ -28,12 +36,16 @@
 
 #include <ANN/ANN.h>
 
+// #include <Python.h>
+// #include <matplotlib/matplotlibcpp.h>
+// namespace plt = matplotlibcpp;
+
 #include "Open3D/Geometry/TriangleMesh.h"
 #include "Open3D/IO/TriangleMeshIO.h"
 
 #include "tsne/tsne.h"
 
-#include "Features.hpp"
+#include "FeatureDatabase.hpp"
 #include "Normalize.hpp"
 #include "PreProcess.hpp"
 
@@ -56,20 +68,25 @@ double r_ann = 1.0;
 int k_ann = 20;
 double r_us = 0.45;
 int k_us = 20;
-std::vector<int> ann_weights({1, 1, 1, 1, 1, 1, 1, 1, 1, 1});
+std::vector<int> weights(10);
 
+/// Custom ImGui menu for the MR application.
 class CustomMenu : public igl::opengl::glfw::imgui::ImGuiMenu
 {
-
   public:
 	ANNkd_tree f_tree;
 	int TP = 0, FP = 0;
 	const char *curr_class = NULL;
+	string filename = "";
+	const char *algs[4] = {"K-nearest ANN", "R-nearest ANN", "K-nearest Custom",
+						   "R-nearest Custom"};
+	const char *curr_alg = algs[0];
 
 	CustomMenu(double *pa, int n) : f_tree(pa, n, Features::size())
 	{
 	}
 
+	/// Reset the camera for given viewer core to original position.
 	void reset_camera(igl::opengl::ViewerCore &c)
 	{
 		c.camera_zoom = 1;
@@ -89,6 +106,7 @@ class CustomMenu : public igl::opengl::glfw::imgui::ImGuiMenu
 		c.camera_up << 0, 1, 0;
 	}
 
+	/// Setup the viewer to display the current page of results.
 	void set_result_meshes()
 	{
 		for (size_t i = 0; i < pageSize; i++)
@@ -107,6 +125,7 @@ class CustomMenu : public igl::opengl::glfw::imgui::ImGuiMenu
 		viewer->data_list[0].set_visible(false, viewer->core_list[0].id);
 	}
 
+	/// Setup the pages vector and increment correct statistic(FP or TP) if curr_class has a value.
 	void setup_pages_and_stats(const pair<double, filesystem::path> &d)
 	{
 		if (pages[pages.size() - 1].size() >= pageSize)
@@ -124,6 +143,7 @@ class CustomMenu : public igl::opengl::glfw::imgui::ImGuiMenu
 		cout << d.first << ": " << d.second << endl;
 	}
 
+	/// Overide menu drawer to add labels in result viewer.
 	virtual void draw_menu() override
 	{
 		// Text labels
@@ -152,8 +172,10 @@ class CustomMenu : public igl::opengl::glfw::imgui::ImGuiMenu
 		}
 	}
 
+	/// Create ImGui window with the labels for the currently selected page.
 	void draw_custom_lables()
 	{
+		// Create window
 		ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiSetCond_Always);
 		ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize, ImGuiSetCond_Always);
 		bool visible = true;
@@ -164,6 +186,7 @@ class CustomMenu : public igl::opengl::glfw::imgui::ImGuiMenu
 						 ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar |
 						 ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoCollapse |
 						 ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoInputs);
+		// Add labels to draw list
 		ImDrawList *drawList = ImGui::GetWindowDrawList();
 		for (size_t i = 0; i < pages[page].size(); i++)
 		{
@@ -184,27 +207,21 @@ class CustomMenu : public igl::opengl::glfw::imgui::ImGuiMenu
 							  ImGui::GetColorU32(ImVec4(1, 1, 1, 1)), &str[0],
 							  &str[0] + str.size());
 		}
+		// End drawing of window
 		ImGui::End();
 		ImGui::PopStyleColor();
 		ImGui::PopStyleVar();
 	}
 
-	virtual void draw_viewer_menu() override
+	/// Viewing options submenu
+	void ViewingOptions()
 	{
-		// Draw parent menu
-		// ImGuiMenu::draw_viewer_menu();
-
-		// Viewing options
 		if (ImGui::CollapsingHeader("Viewing Options", ImGuiTreeNodeFlags_DefaultOpen))
 		{
-			/*if (ImGui::Button("Fit model to viewport", ImVec2(-1, 0)))
-			{
-				int data_id = viewer->core_index(viewer->core().id);
-				viewer->core().align_camera_center(viewer->data_list[data_id].V,
-												   viewer->data_list[data_id].F);
-			}*/
+			// Snap to canonical
 			if (ImGui::Button("Snap canonical view", ImVec2(-1, 0)))
 				viewer->snap_to_canonical_quaternion();
+			// Reset camera
 			if (ImGui::Button("Reset camera", ImVec2(-1, 0)))
 				reset_camera(viewer->core());
 
@@ -243,10 +260,14 @@ class CustomMenu : public igl::opengl::glfw::imgui::ImGuiMenu
 			ImGui::Checkbox("Orthographic view", &(viewer->core().orthographic));
 			ImGui::PopItemWidth();
 		}
+	}
 
-		// Draw options
+	/// Drawing options submenu
+	void DrawingOptions()
+	{
 		if (ImGui::CollapsingHeader("Draw Options", ImGuiTreeNodeFlags_DefaultOpen))
 		{
+			// Face based rendering
 			static bool face_based = false;
 			if (ImGui::Checkbox("Face-based", &face_based))
 			{
@@ -256,6 +277,8 @@ class CustomMenu : public igl::opengl::glfw::imgui::ImGuiMenu
 					d.dirty = igl::opengl::MeshGL::DIRTY_ALL;
 				}
 			}
+
+			// Shininess
 			ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.3f);
 			static float shininess = 50.f;
 			if (ImGui::DragFloat("Shininess", &shininess, 0.05f, 0.0f, 100.0f))
@@ -263,23 +286,109 @@ class CustomMenu : public igl::opengl::glfw::imgui::ImGuiMenu
 					d.shininess = shininess;
 			ImGui::PopItemWidth();
 
+			// Wireframe drawing toggle
 			static bool wireframe = true;
 			if (ImGui::Checkbox("Wireframe", &wireframe))
 				for (size_t i = 0; i <= pageSize; i++)
 					viewer->core_list[i].set(viewer->data_list[i].show_lines, wireframe);
 
+			// Filling drawing toggle
 			static bool fill = true;
 			if (ImGui::Checkbox("Fill", &fill))
 				for (size_t i = 0; i <= pageSize; i++)
 					viewer->core_list[i].set(viewer->data_list[i].show_faces, fill);
 		}
+	}
 
-		// Add new group
+	void Search()
+	{
+		if (ImGui::Button("Search"))
+		{
+			std::cout << "Opened file " << filename << "\n";
+			auto mesh = open3d::io::CreateMeshFromFile(filename);
+			PreProcess(mesh);
+			Normalize(mesh);
+			Features features(mesh);
+			fdb.NormalizeFeatures(features);
+			features.WeightFeatures(weights);
+
+			pages.push_back(vector<pair<double, filesystem::path>>());
+			TP = 0, FP = 0;
+			if (curr_alg == algs[0])
+			{
+				vector<int> nn_idx(k_ann);
+				vector<double> dd(k_ann);
+				f_tree.annkSearch(features.data(), k_ann, nn_idx.data(), dd.data());
+				for (size_t i = 0; i < k_ann; i++)
+					setup_pages_and_stats(make_pair(dd[i], fdb.meshes[nn_idx[i]]));
+			}
+			else if (curr_alg == algs[1])
+			{
+				vector<int> nn_idx(numMeshes);
+				vector<double> dd(numMeshes);
+				f_tree.annkSearch(features.data(), int(numMeshes), nn_idx.data(), dd.data());
+				for (size_t i = 0; i < numMeshes; i++)
+				{
+					if (dd[i] > r_ann)
+						break;
+					setup_pages_and_stats(make_pair(dd[i], fdb.meshes[nn_idx[i]]));
+				}
+			}
+			else if (curr_alg == algs[2])
+			{
+				auto dists = fdb.CalcDistances(features);
+				sort(dists.begin(), dists.end());
+				for (size_t i = 0; i < k_us; i++)
+					setup_pages_and_stats(dists[i]);
+			}
+			else if (curr_alg == algs[3])
+			{
+				auto dists = fdb.CalcDistances(features);
+				sort(dists.begin(), dists.end());
+				for (const auto &d : dists)
+				{
+					if (d.first > r_us)
+						break;
+					setup_pages_and_stats(d);
+				}
+			}
+
+			if (curr_class)
+			{
+				size_t P = ccs[string(curr_class)];
+				size_t N = numMeshes - P;
+				size_t TN = N - FP;
+				size_t FN = P - TP;
+
+				cout << "Class: " << curr_class << endl
+					 << "Class size: " << P << endl
+					 << "TP: " << TP << endl
+					 << "FP: " << FP << endl
+					 << "TN: " << TN << endl
+					 << "FN: " << FN << endl
+					 << "Recall: " << double(TP) / P << endl
+					 << "Selectivity: " << double(TN) / N << endl
+					 << "Precision: " << TP / double(TP + FP) << endl
+					 << "NPV: " << TN / double(TN + FN) << endl
+					 << "Threat Score: " << TP / double(TP + FN + FP) << endl
+					 << "Accuracy: " << double(TP + TN) / numMeshes << endl
+					 << "F1 Score: " << double(2 * TP) / double(2 * TP + FP + FN) << endl;
+			}
+
+			set_result_meshes();
+			filename = "";
+			curr_class = NULL;
+		}
+	}
+
+	/// Search options submenu
+	void SearchOptions()
+	{
 		if (ImGui::CollapsingHeader("Search Options", ImGuiTreeNodeFlags_DefaultOpen))
 		{
 			static shared_ptr<pfd::open_file> open_file;
-			static string filename = "";
 
+			// Class picker
 			ImGui::PushItemWidth(ImGui::GetWindowWidth() / 1.75f);
 			if (ImGui::BeginCombo("Class", curr_class)) // The second parameter is the label
 														// previewed before opening the combo.
@@ -300,9 +409,7 @@ class CustomMenu : public igl::opengl::glfw::imgui::ImGuiMenu
 				ImGui::EndCombo();
 			}
 
-			const char *algs[] = {"K-nearest ANN", "R-nearest ANN", "K-nearest Custom",
-								  "R-nearest Custom"};
-			static const char *curr_alg = algs[0];
+			// Algorithm picker
 			if (ImGui::BeginCombo("Algorithm", curr_alg))
 			{
 				for (int n = 0; n < IM_ARRAYSIZE(algs); n++)
@@ -317,6 +424,7 @@ class CustomMenu : public igl::opengl::glfw::imgui::ImGuiMenu
 			}
 			ImGui::PopItemWidth();
 
+			// Algorithm parameter
 			const double minDrag = 0.1, maxDrag = 10.0;
 			if (curr_alg == algs[0])
 				ImGui::DragInt("Number of results", &k_ann, 1.0f, 1, 100);
@@ -329,6 +437,7 @@ class CustomMenu : public igl::opengl::glfw::imgui::ImGuiMenu
 				ImGui::DragScalar("Radius threshold", ImGuiDataType_Double, &r_us, 0.05f, &minDrag,
 								  &maxDrag, "%.3f");
 
+			// File dialog
 			ImGui::PushItemFlag(ImGuiItemFlags_Disabled, (bool)open_file);
 			if (ImGui::Button("Open File"))
 				open_file = std::make_shared<pfd::open_file>(
@@ -358,87 +467,17 @@ class CustomMenu : public igl::opengl::glfw::imgui::ImGuiMenu
 
 			if (filename.size())
 			{
+				// Selected file textfield
+				filesystem::path filePath(filename);
 				ImGui::SameLine();
-				ImGui::Text(filesystem::path(filename).filename().string().c_str());
-				if (ImGui::Button("Search"))
-				{
-					std::cout << "Opened file " << filename << "\n";
-					auto mesh = open3d::io::CreateMeshFromFile(filename);
-					PreProcess(mesh);
-					Normalize(mesh);
-					auto features = CalcFeatures(mesh);
-					fdb.NormalizeFeatures(features);
-					features.WeightFeatures(ann_weights);
+				ImGui::Text(
+					(filePath.parent_path().filename() / filePath.filename()).string().c_str());
 
-					pages.push_back(vector<pair<double, filesystem::path>>());
-					TP = 0, FP = 0;
-					if (curr_alg == algs[0])
-					{
-						vector<int> nn_idx(k_ann);
-						vector<double> dd(k_ann);
-						f_tree.annkSearch(features.data(), k_ann, nn_idx.data(), dd.data());
-						for (size_t i = 0; i < k_ann; i++)
-							setup_pages_and_stats(make_pair(dd[i], fdb.meshes[nn_idx[i]]));
-					}
-					else if (curr_alg == algs[1])
-					{
-						vector<int> nn_idx(numMeshes);
-						vector<double> dd(numMeshes);
-						f_tree.annkSearch(features.data(), int(numMeshes), nn_idx.data(), dd.data());
-						for (size_t i = 0; i < numMeshes; i++)
-						{
-							if (dd[i] > r_ann)
-								break;
-							setup_pages_and_stats(make_pair(dd[i], fdb.meshes[nn_idx[i]]));
-						}
-					}
-					else if (curr_alg == algs[2])
-					{
-						auto dists = fdb.CalcDistances(features);
-						sort(dists.begin(), dists.end());
-						for (size_t i = 0; i < k_us; i++)
-							setup_pages_and_stats(dists[i]);
-					}
-					else if (curr_alg == algs[3])
-					{
-						auto dists = fdb.CalcDistances(features);
-						sort(dists.begin(), dists.end());
-						for (const auto &d : dists)
-						{
-							if (d.first > r_us)
-								break;
-							setup_pages_and_stats(d);
-						}
-					}
-
-					if (curr_class)
-					{
-						size_t P = ccs[string(curr_class)];
-						size_t N = numMeshes - P;
-						size_t TN = N - FP;
-						size_t FN = P - TP;
-
-						cout << "Class: " << curr_class << endl
-							 << "Class size: " << P << endl
-							 << "TP: " << TP << endl
-							 << "FP: " << FP << endl
-							 << "TN: " << TN << endl
-							 << "FN: " << FN << endl
-							 << "Recall: " << double(TP) / P << endl
-							 << "Selectivity: " << double(TN) / N << endl
-							 << "Precision: " << TP / double(TP + FP) << endl
-							 << "NPV: " << TN / double(TN + FN) << endl
-							 << "Threat Score: " << TP / double(TP + FN + FP) << endl
-							 << "Accuracy: " << double(TP + TN) / numMeshes << endl
-							 << "F1 Score: " << double(2 * TP) / double(2 * TP + FP + FN) << endl;
-					}
-
-					set_result_meshes();
-					filename = "";
-					curr_class = NULL;
-				}
+				// Search button and logic
+				Search();
 			}
 
+			// Page switcher
 			if (pages.size())
 			{
 				if (page > 0)
@@ -463,12 +502,17 @@ class CustomMenu : public igl::opengl::glfw::imgui::ImGuiMenu
 			}
 		}
 	}
-};
 
-bool key_down(igl::opengl::glfw::Viewer &view, unsigned char key, int modifier)
-{
-	return false;
-}
+	/// Main menu and only menu user can interact with.
+	virtual void draw_viewer_menu() override
+	{
+		ViewingOptions();
+
+		DrawingOptions();
+
+		SearchOptions();
+	}
+};
 
 int main(int argc, char *argv[])
 {
@@ -484,6 +528,8 @@ int main(int argc, char *argv[])
 			 << "\t-t: Perform T-SNE calculation" << endl;
 		return EXIT_SUCCESS;
 	}
+
+	// Preprocess
 	if (options.find('p') != options.npos)
 	{
 		vector<filesystem::path> originals = getAllFilesInDir(ORIGINAL_DIR);
@@ -492,6 +538,7 @@ int main(int argc, char *argv[])
 		PreProcessMeshDatabase(originals);
 	}
 
+	// Normalize
 	if (options.find('n') != options.npos)
 	{
 		vector<filesystem::path> preprossed = getAllFilesInDir(PREPROCESSED_DIR);
@@ -500,6 +547,7 @@ int main(int argc, char *argv[])
 		NormalizeMeshDataBase(preprossed);
 	}
 
+	// Gather feature database
 	if (options.find('f') != options.npos)
 	{
 		if (options.find('n') == options.npos)
@@ -508,11 +556,12 @@ int main(int argc, char *argv[])
 		sort(normalized.begin(), normalized.end(), greater<filesystem::path>());
 		if (!filesystem::exists(FEATURE_DIR))
 			filesystem::create_directories(FEATURE_DIR);
-		fdb = CalculateFeaturesMeshDatabase(normalized);
+		fdb = FeatureDatabase(normalized);
 	}
 	else
 		fdb = FeatureDatabase(FEATURE_DIR);
 
+	// Gather class stats
 	std::vector<std::filesystem::path> files = getAllFilesInDir(PREPROCESSED_DIR);
 	for (auto &f : files)
 	{
@@ -523,6 +572,7 @@ int main(int argc, char *argv[])
 	for (auto it = ccs.begin(); it != ccs.end(); ++it)
 		classes.push_back(it->first);
 
+	// Gather weights (EDIT CODE MANUALLY)
 	if (options.find('w') != options.npos)
 	{
 		double best_prec = 0;
@@ -564,27 +614,28 @@ int main(int argc, char *argv[])
 							if (precision > best_prec)
 							{
 								best_prec = precision;
-								ann_weights = curr_weights;
+								weights = curr_weights;
 							}
 						}
-		ofstream weight_file(ASSET_PATH "/weights.txt");
+		ofstream weight_file(WEIGHTS_FILE);
 		for (size_t i = 0; i < 10; i++)
-			weight_file << ann_weights[i] << endl;
+			weight_file << weights[i] << endl;
 		weight_file.close();
 	}
 	else
 	{
-		ifstream weight_file(ASSET_PATH "/weights.txt");
+		ifstream weight_file(WEIGHTS_FILE);
 		for (size_t i = 0; i < 10; i++)
-			weight_file >> ann_weights[i];
+			weight_file >> weights[i];
 		weight_file.close();
 	}
 
-	fdb.WeightFeatures(ann_weights);
-
+	// Weight database and setup menu
+	fdb.WeightFeatures(weights);
 	auto feats = fdb.GetFeatureVectors();
 	CustomMenu menu(feats.data(), int(fdb.features.size()));
 
+	// Calculate statistics
 	if (options.find('s') != options.npos)
 	{
 		map<string, pair<double, double>> classPerf;
@@ -593,11 +644,11 @@ int main(int argc, char *argv[])
 		{
 			auto parent = fdb.meshes[i].parent_path();
 			auto curr_class = parent.string().substr(parent.parent_path().string().size() + 1);
-			int FP = 0, TP = 0;
-#if 1 // ANN
-			vector<int> nn_idx(k_ann);
-			vector<double> dd(k_ann);
-			menu.f_tree.annkSearch(&feats[i * Features::size()], k_ann, nn_idx.data(), dd.data());
+			int FP = 0, TP = 0, k = 20;
+#ifdef ANN_STATS
+			vector<int> nn_idx(k);
+			vector<double> dd(k);
+			menu.f_tree.annkSearch(&feats[i * Features::size()], k, nn_idx.data(), dd.data());
 			for (int id : nn_idx)
 			{
 				auto p = fdb.meshes[id].parent_path();
@@ -610,7 +661,7 @@ int main(int argc, char *argv[])
 #else
 			auto dists = fdb.CalcDistances(fdb.features[i]);
 			sort(dists.begin(), dists.end());
-			for (size_t i = 0; i < k_us; i++)
+			for (size_t i = 0; i < k; i++)
 			{
 				auto p = dists[i].second.parent_path();
 				auto m_class = p.string().substr(p.parent_path().string().size() + 1);
@@ -625,6 +676,7 @@ int main(int argc, char *argv[])
 			classPerf[curr_class].second += TP / double(TP + FP);
 		}
 
+		// Average stats over classes and total
 		double recall = 0, precision = 0;
 		ofstream perf_file(ASSET_PATH "/perf.txt");
 		for (const auto &cs : ccs)
@@ -642,10 +694,17 @@ int main(int argc, char *argv[])
 		precision /= fdb.features.size();
 		perf_file << "total " << recall << " " << precision << endl;
 		perf_file.close();
+
+#ifdef ANN_STATS
+		cout << "Calculated statistics with ANN" << endl;
+#else
+		cout << "Calculated statistics with Custom metrics" << endl;
+#endif
 		cout << "Recall over entire database: " << recall << endl
 			 << "Precision over entire database: " << precision << endl;
 	}
 
+	// Setup viewer
 	igl::opengl::glfw::Viewer viewer;
 	for (size_t i = 0; i <= pageSize; i++)
 		viewer.append_mesh();
@@ -674,21 +733,42 @@ int main(int argc, char *argv[])
 		return false;
 	};
 
-	viewer.callback_key_down = &key_down;
 	viewer.plugins.push_back(&menu);
 	viewer.launch();
 
+	// T-SNE calculation
 	if (options.find('t') != options.npos)
 	{
 		auto why_you_edit_pointer = fdb.GetFeatureVectors();
 		size_t out_dim = 2;
 		double *out_vec = (double *)malloc(numMeshes * out_dim * sizeof(double));
 		double *costs = (double *)calloc(numMeshes, sizeof(double));
-		TSNE::run(why_you_edit_pointer.data(), int(numMeshes), Features::size(), out_vec, int(out_dim), 50,
-				  0.5, 1, false, 1000, 250, 250);
+		TSNE::run(why_you_edit_pointer.data(), int(numMeshes), Features::size(), out_vec,
+				  int(out_dim), 50, 0.5, 1, false, 1000, 250, 250);
 		ofstream tsne_file(ASSET_PATH "/tsne.txt");
+		vector<double> X(numMeshes);
+		vector<double> Y(numMeshes);
+		vector<double> C(numMeshes);
 		for (size_t i = 0; i < numMeshes; i++)
+		{
 			tsne_file << out_vec[i * out_dim + 0] << " " << out_vec[i * out_dim + 1] << endl;
+			X[i] = out_vec[i * out_dim + 0];
+			Y[i] = out_vec[i * out_dim + 1];
+			C[i] = (i / 20) / 20.f;
+		}
+		// Failed python plot in c++
+		// try
+		// {
+		// 	plt::scatter(X, Y);
+		// 	plt::show();
+		// }
+		// catch (const std::exception &e)
+		// {
+		// 	std::cerr << e.what() << endl
+		// 			  << "Install Python with MatPlotLib or if that failes use:" << endl
+		// 			  << "\t`python plot.py`" << endl
+		// 			  << "to view the plot of the t-sne." << endl;
+		// }
 		tsne_file.close();
 	}
 	return EXIT_SUCCESS;

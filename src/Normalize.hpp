@@ -7,10 +7,13 @@
 #include "EigenVectors.hpp"
 #include "Utils.hpp"
 
+/// Normalizes a single mesh in place
 void Normalize(const std::shared_ptr<open3d::geometry::TriangleMesh> &mesh)
 {
+	// 1. Translate to barycenter
 	mesh->Translate(-mesh->GetCenter());
 
+	// 2. Rotate to align with eigenvectors
 	Eigen::Affine3d orient;
 	orient.setIdentity();
 	Eigen::Vector3d evals;
@@ -19,6 +22,7 @@ void Normalize(const std::shared_ptr<open3d::geometry::TriangleMesh> &mesh)
 	orient.linear() << evecs.transpose();
 	mesh->Transform(orient.matrix());
 
+	// 3. Flipping via moment test
 	double f_x = 0, f_y = 0, f_z = 0;
 	for (const auto &t : mesh->triangles_)
 	{
@@ -34,9 +38,11 @@ void Normalize(const std::shared_ptr<open3d::geometry::TriangleMesh> &mesh)
 	flipping.linear().diagonal() << sgn(f_x), sgn(f_y), sgn(f_z);
 	mesh->Transform(flipping.matrix());
 
+	// 4. Scale to unit cube
 	mesh->Scale(1.0 / (mesh->GetMaxBound() - mesh->GetMinBound()).maxCoeff());
 }
 
+/// Normalizes the entire mesh database
 void NormalizeMeshDataBase(const std::vector<std::filesystem::path> &files)
 {
 	CalcMeshStatistics(files);

@@ -11,6 +11,7 @@ std::vector<std::string> exts = {".off", ".ply", ".stl"};
 int lowerBoundF = 15000, targetF = 20000, upperBoundF = 25000;
 float avgV = 0, avgF = 0;
 size_t minV = SIZE_MAX, maxV = 0, minF = SIZE_MAX, maxF = 0, numMeshes = 0;
+/// Calculates above mesh database statistcis to be used elsewhere
 void CalcMeshStatistics(const std::vector<std::filesystem::path> &files)
 {
 	avgV = 0;
@@ -47,12 +48,14 @@ void CalcMeshStatistics(const std::vector<std::filesystem::path> &files)
 		   avgV, minV, maxV, avgF, minF, maxF);
 }
 
+/// Returns the sign of a value(-1, 0, 1);
 template <typename T>
 int sgn(T val)
 {
 	return (T(0) < val) - (val < T(0));
 }
 
+/// Simple getter of command options, only supports use of single dash followed by character flags.
 std::string GetCmdOptions(int argc, char **argv)
 {
 	std::string result;
@@ -62,6 +65,9 @@ std::string GetCmdOptions(int argc, char **argv)
 	return result;
 }
 
+/// Replaces dir before class with another
+/// So old path may be: x/y/normalized/Airplane/61.off
+/// then the new path will be: x/y/features/Airplane/61.off
 std::filesystem::path replaceDir(std::filesystem::path old, std::string newPath)
 {
 	auto dir = std::filesystem::path(newPath) / old.parent_path().filename();
@@ -70,16 +76,15 @@ std::filesystem::path replaceDir(std::filesystem::path old, std::string newPath)
 	return dir / old.filename();
 }
 
-static bool endsWith(const std::string &str, const std::string &ending)
+/// Returns true if str ends in ending;
+bool endsWith(const std::string &str, const std::string &ending)
 {
 	if (str.length() < ending.length())
 		return false;
 	return str.compare(str.length() - ending.length(), ending.length(), ending) == 0;
 }
 
-/*
-string split implementation by using delimiter as a character.
-*/
+/// string split implementation by using delimiter as a character.
 std::vector<std::string> split(std::string strToSplit, char delimeter)
 {
 	std::stringstream ss(strToSplit);
@@ -94,7 +99,7 @@ std::vector<std::string> split(std::string strToSplit, char delimeter)
 
 // Based on
 // https://thispointer.com/c-get-the-list-of-all-files-in-a-given-directory-and-its-sub-directories-using-boost-c17/
-/*
+/**
  * Get the list of all files in given directory and its sub directories.
  *
  * Arguments

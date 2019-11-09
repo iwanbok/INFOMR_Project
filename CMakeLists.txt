@@ -14,10 +14,20 @@ option(LIBIGL_WITH_OPENGL_GLFW_IMGUI "Use OpenGL viewer with ImGui" ON)
 
 find_package(LIBIGL REQUIRED QUIET)
 find_package(QHULL REQUIRED QUIET)
-find_package(PythonInterp 3.5 REQUIRED)
 
+# find_package(PythonInterp 3.5 REQUIRED)
 # This goes after, since it uses PythonInterp as hint
-find_package(PythonLibs 3.5 REQUIRED)
+# find_package(PythonLibs 3.5 REQUIRED)
+
+# exec_program(${PYTHON_EXECUTABLE}
+#              ARGS "-c \"import numpy; print(numpy.get_include())\""
+#              OUTPUT_VARIABLE NUMPY_INCLUDE_DIR
+#              RETURN_VALUE NUMPY_NOT_FOUND
+#             )
+# string(STRIP ${NUMPY_INCLUDE_DIR} NUMPY_INCLUDE_DIR)
+# if(NUMPY_NOT_FOUND)
+#     message(FATAL_ERROR "NumPy headers not found")
+# endif()
 
 # Add your project files
 file( GLOB RPLY_FILES include/rply/*.c )
@@ -29,10 +39,11 @@ file( GLOB SRC_FILES src/*.cpp src/*.c)
 file( GLOB HDR_FILES src/*.hpp src/*.h)
 
 add_compile_definitions(ASSET_PATH="${CMAKE_CURRENT_SOURCE_DIR}/data/" )
-add_executable( ${PROJECT_NAME}_bin ${RPLY_FILES} ${EMD_FILES} ${OPEN3D_FILES} ${ANN_FILES} ${TSNE_FILES} ${SRC_FILES})
+add_executable( ${PROJECT_NAME}_bin ${RPLY_FILES} ${EMD_FILES} ${OPEN3D_FILES} ${ANN_FILES} ${TSNE_FILES} ${SRC_FILES} ${HDR_FILES})
 
 target_link_libraries(${PROJECT_NAME}_bin       PRIVATE igl::core igl::opengl_glfw igl::opengl_glfw_imgui ${qhull_LIBRARIES} ${PYTHON_LIBRARIES})
 target_include_directories(${PROJECT_NAME}_bin  PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include ${qhull_INCLUDE_DIRS} ${PYTHON_INCLUDE_DIRS})
+# target_include_directories(${PROJECT_NAME}_bin  PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include ${qhull_INCLUDE_DIRS} ${NUMPY_INCLUDE_DIR} ${PYTHON_INCLUDE_DIRS})
 
 source_group("rply"         FILES ${RPLY_FILES})
 source_group("emd"          FILES ${EMD_FILES})

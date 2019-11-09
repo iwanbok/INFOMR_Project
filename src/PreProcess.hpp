@@ -12,19 +12,25 @@
 #include "EigenVectors.hpp"
 #include "Utils.hpp"
 
+/// Preprossess a single mesh in place
 void PreProcess(std::shared_ptr<open3d::geometry::TriangleMesh> &mesh)
 {
+	// Basic cleaning
 	mesh->RemoveDuplicatedTriangles();
 	mesh->RemoveDuplicatedVertices();
 	mesh->RemoveDegenerateTriangles();
 	mesh->RemoveUnreferencedVertices();
+
+	// Upsample the mesh if needed(can go over upperBoundF)
 	if (mesh->triangles_.size() < lowerBoundF)
 		while (mesh->triangles_.size() < targetF)
 			mesh = mesh->SubdivideMidpoint(1);
+	// Downsample mesh if needed(CANNOT go below targetF)
 	if (mesh->triangles_.size() > upperBoundF)
 		mesh = mesh->SimplifyQuadricDecimation(targetF);
 }
 
+/// Writes an info file with basic mesh information(info no longer used).
 void WriteInfoFile(const std::filesystem::path &file,
 				   const std::shared_ptr<open3d::geometry::TriangleMesh> &mesh)
 {
@@ -49,6 +55,7 @@ void WriteInfoFile(const std::filesystem::path &file,
 	infoFile.close();
 }
 
+/// Preprocesses the entire mesh database
 void PreProcessMeshDatabase(const std::vector<std::filesystem::path> &files)
 {
 	CalcMeshStatistics(files);
@@ -58,6 +65,7 @@ void PreProcessMeshDatabase(const std::vector<std::filesystem::path> &files)
 			auto mesh = open3d::io::CreateMeshFromFile(f.string());
 			PreProcess(mesh);
 			WriteInfoFile(f, mesh);
-			open3d::io::WriteTriangleMesh(replaceDir(f, PREPROCESSED_DIR).string(), *mesh, true, true);
+			open3d::io::WriteTriangleMesh(replaceDir(f, PREPROCESSED_DIR).string(), *mesh, true,
+										  true);
 		}
 }
