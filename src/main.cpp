@@ -5,7 +5,6 @@
 // #define L2        // UNCOMMENT FOR L2 Distance metric
 // #define EMD       // UNCOMMENT FOR EMD Distance metric (does not work in ANN, overides L2 in
 // Custom metric case)
-#define ANN_STATS // COMMENT FOR USING CUSTOM METRICS FOR STATS
 #define ORIGINAL_DIR ASSET_PATH "LabeledDB_new"
 #define PREPROCESSED_DIR ASSET_PATH "preprocessed"
 #define NORMALIZED_DIR ASSET_PATH "normalized"
@@ -637,7 +636,7 @@ int main(int argc, char *argv[])
 	CustomMenu menu(feats.data(), int(fdb.features.size()));
 
 	// Calculate statistics
-	if (options.find('s') != options.npos)
+	if (options.find('a') != options.npos || options.find('c') != options.npos)
 	{
 		map<string, double> classPerf;
 
@@ -646,45 +645,51 @@ int main(int argc, char *argv[])
 			auto parent = fdb.meshes[i].parent_path();
 			auto curr_class = parent.string().substr(parent.parent_path().string().size() + 1);
 			int FP = 0, TP = 0, k = 20;
-#ifdef ANN_STATS
-			vector<int> nn_idx(k);
-			vector<double> dd(k);
-			menu.f_tree.annkSearch(&feats[i * Features::size()], k, nn_idx.data(), dd.data());
-			for (int id : nn_idx)
+			if (options.find('a') != options.npos)
 			{
-				auto p = fdb.meshes[id].parent_path();
-				auto m_class = p.string().substr(p.parent_path().string().size() + 1);
-				if (curr_class.compare(m_class))
-					FP++;
-				else
-					TP++;
+				vector<int> nn_idx(k);
+				vector<double> dd(k);
+				menu.f_tree.annkSearch(&feats[i * Features::size()], k, nn_idx.data(), dd.data());
+				for (int id : nn_idx)
+				{
+					auto p = fdb.meshes[id].parent_path();
+					auto m_class = p.string().substr(p.parent_path().string().size() + 1);
+					if (curr_class.compare(m_class))
+						FP++;
+					else
+						TP++;
+				}
 			}
-#else
-			auto dists = fdb.CalcDistances(fdb.features[i]);
-			sort(dists.begin(), dists.end());
-			for (size_t i = 0; i < k; i++)
+			else
 			{
-				auto p = dists[i].second.parent_path();
-				auto m_class = p.string().substr(p.parent_path().string().size() + 1);
-				if (curr_class.compare(m_class))
-					FP++;
-				else
-					TP++;
+				auto dists = fdb.CalcDistances(fdb.features[i]);
+				sort(dists.begin(), dists.end());
+				for (size_t i = 0; i < k; i++)
+				{
+					auto p = dists[i].second.parent_path();
+					auto m_class = p.string().substr(p.parent_path().string().size() + 1);
+					if (curr_class.compare(m_class))
+						FP++;
+					else
+						TP++;
+				}
 			}
-#endif
 			classPerf[curr_class] += TP / double(TP + FP);
 		}
 
 		// Average stats over classes and total
 		double precision = 0;
 		ofstream perf_file(ASSET_PATH "/perf.txt");
-#ifdef ANN_STATS
-		cout << "Calculated precision with ANN" << endl;
-		perf_file << "ANN Statistics" << endl;
-#else
-		cout << "Calculated precision with Custom metrics" << endl;
-		perf_file << "Custom metric Statistics" << endl;
-#endif
+		if (options.find('a') != options.npos)
+		{
+			cout << "Calculated precision with ANN" << endl;
+			perf_file << "ANN Statistics" << endl;
+		}
+		else
+		{
+			cout << "Calculated precision with Custom metrics" << endl;
+			perf_file << "Custom metric Statistics" << endl;
+		}
 		perf_file << "Class Precision" << endl;
 		cout << "Class Precision" << endl;
 		for (const auto &cs : ccs)

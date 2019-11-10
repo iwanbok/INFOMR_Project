@@ -26,6 +26,13 @@ The program can be run with the following command line options:
 -n: Normalize Meshes
 -f: Calculate database feautures
 -w: Optimize the weights, not recommended as this is partially done with manual code edits and thus will not work out of the box
--s: Calculate database retrieval performance statistics
+-a: Calculate database retrieval performance statistics with ANN. Mutually exclusive with -c
+-c: Calculate database retrieval performance statistics with Custom distance metrics. Mutually exclusive with -a
 -t: Perform T-SNE calculation
 ```
+
+## Changing the distance metrics
+This application supports several distance metrics in its execution, these are however determined in compile time. Thus to change the distance metrics (un)comment the following lines in [main.cpp](src/main.cpp):
+
+- Line 5 `#define L2` if uncommented L2 is used by the custom distance metric, unless `#define EMD` is uncommented and ANN. Otherwise L1 is used.
+- Line 6 `#define EMD` if uncommented EMD is used by the custom distance metric, overriding L2. ANN still uses either L2 or L1.
