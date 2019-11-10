@@ -6,6 +6,7 @@
 
 #include "Open3D/IO/TriangleMeshIO.h"
 
+#include "defines.h"
 #include "Features.hpp"
 #include "Utils.hpp"
 

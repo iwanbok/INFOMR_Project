@@ -32,7 +32,7 @@ The program can be run with the following command line options:
 ```
 
 ## Changing the distance metrics
-This application supports several distance metrics in its execution, these are however determined in compile time. Thus to change the distance metrics (un)comment the following lines in [main.cpp](src/main.cpp):
+This application supports several distance metrics in its execution, these are however determined in compile time. Thus to change the distance metrics (un)comment the following lines in [defines.h](src/defines.h):
 
-- Line 5 `#define L2` if uncommented L2 is used by the custom distance metric, unless `#define EMD` is uncommented and ANN. Otherwise L1 is used.
-- Line 6 `#define EMD` if uncommented EMD is used by the custom distance metric, overriding L2. ANN still uses either L2 or L1.
+- Line 5 `#define L2_METRIC` if uncommented L2 is used by the custom distance metric, unless `#define EMD` is uncommented and ANN. Otherwise L1 is used.
+- Line 6 `#define EMD_METRIC` if uncommented EMD is used by the custom distance metric, overriding L2. ANN still uses either L2 or L1.

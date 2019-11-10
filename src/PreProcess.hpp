@@ -9,6 +9,7 @@
 
 #include "Open3D/IO/TriangleMeshIO.h"
 
+#include "defines.h"
 #include "EigenVectors.hpp"
 #include "Utils.hpp"
 
@@ -30,31 +31,6 @@ void PreProcess(std::shared_ptr<open3d::geometry::TriangleMesh> &mesh)
 		mesh = mesh->SimplifyQuadricDecimation(targetF);
 }
 
-/// Writes an info file with basic mesh information(info no longer used).
-void WriteInfoFile(const std::filesystem::path &file,
-				   const std::shared_ptr<open3d::geometry::TriangleMesh> &mesh)
-{
-	std::ofstream infoFile;
-	infoFile.open(replaceDir(file, INFO_DIR) / ".info");
-	// mesh
-	infoFile << file << std::endl;
-	// class
-	auto parent = file.parent_path();
-	infoFile << parent.string().substr(parent.parent_path().string().size() + 1) << std::endl;
-	// # vertices
-	infoFile << mesh->vertices_.size() << std::endl;
-	// # faces
-	infoFile << mesh->triangles_.size() << std::endl;
-	// Minimal corner
-	infoFile << mesh->GetMinBound().transpose() << std::endl;
-	// Maximal corner
-	infoFile << mesh->GetMaxBound().transpose() << std::endl;
-	// Barycenter
-	infoFile << mesh->GetCenter().transpose() << std::endl;
-
-	infoFile.close();
-}
-
 /// Preprocesses the entire mesh database
 void PreProcessMeshDatabase(const std::vector<std::filesystem::path> &files)
 {
@@ -64,7 +40,6 @@ void PreProcessMeshDatabase(const std::vector<std::filesystem::path> &files)
 		{
 			auto mesh = open3d::io::CreateMeshFromFile(f.string());
 			PreProcess(mesh);
-			WriteInfoFile(f, mesh);
 			open3d::io::WriteTriangleMesh(replaceDir(f, PREPROCESSED_DIR).string(), *mesh, true,
 										  true);
 		}

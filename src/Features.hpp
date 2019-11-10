@@ -11,6 +11,7 @@
 #include "Open3D/Geometry/BoundingVolume.h"
 #include "Open3D/Geometry/TriangleMesh.h"
 
+#include "defines.h"
 #include "EigenVectors.hpp"
 #include "Histogram.hpp"
 #include "Utils.hpp"
@@ -297,7 +298,7 @@ struct Features
 	/// set method.
 	double Distance(Features other)
 	{
-#ifdef EMD // EMD + L2
+#ifdef EMD_METRIC // EMD + L2
 		const Eigen::VectorXf weights = Eigen::VectorXf::Constant(A3_size, 1);
 		auto dist = [](const feature_t *left, const feature_t *right) {
 			return float(std::abs(*left - *right));
@@ -335,12 +336,12 @@ struct Features
 #else
 		Eigen::Matrix<double, 55, 1> l(data());
 		Eigen::Matrix<double, 55, 1> r(other.data());
- #ifdef L2  // L2
+ #ifdef L2_METRIC  // L2
 		return std::sqrt((l - r).cwiseAbs2().sum());
  #else      // L1
 		return (l - r).cwiseAbs().sum();
- #endif L2
-#endif EMD
+ #endif L2_METRIC
+#endif EMD_METRIC
 	}
 
 	/// Weight this feature vector with provided weights

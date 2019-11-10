@@ -1,21 +1,3 @@
-#ifndef ASSET_PATH
-#define ASSET_PATH "data/"
-#endif
-
-// #define L2        // UNCOMMENT FOR L2 Distance metric
-// #define EMD       // UNCOMMENT FOR EMD Distance metric (does not work in ANN, overides L2 in
-// Custom metric case)
-#define ORIGINAL_DIR ASSET_PATH "LabeledDB_new"
-#define PREPROCESSED_DIR ASSET_PATH "preprocessed"
-#define NORMALIZED_DIR ASSET_PATH "normalized"
-#define FEATURE_DIR ASSET_PATH "features"
-#define INFO_DIR ASSET_PATH "info"
-#ifdef L2
-#define WEIGHTS_FILE ASSET_PATH "weights - L2.txt"
-#else
-#define WEIGHTS_FILE ASSET_PATH "weights - L1.txt"
-#endif
-
 #include <igl/opengl/MeshGL.h>
 #include <igl/opengl/glfw/Viewer.h>
 #include <igl/opengl/glfw/imgui/ImGuiHelpers.h>
@@ -45,6 +27,7 @@
 
 #include "tsne/tsne.h"
 
+#include "defines.h"
 #include "FeatureDatabase.hpp"
 #include "Normalize.hpp"
 #include "PreProcess.hpp"
@@ -133,9 +116,8 @@ class CustomMenu : public igl::opengl::glfw::imgui::ImGuiMenu
 		pages[pages.size() - 1].push_back(d);
 		if (curr_class)
 		{
-			auto p = d.second.parent_path();
-			auto m_class = p.string().substr(p.parent_path().string().size() + 1);
-			if (strcmp(curr_class, m_class.c_str()))
+			auto m_class = d.second.parent_path().filename().string();
+			if (m_class.compare(curr_class))
 				FP++;
 			else
 				TP++;
@@ -564,11 +546,7 @@ int main(int argc, char *argv[])
 	// Gather class stats
 	std::vector<std::filesystem::path> files = getAllFilesInDir(PREPROCESSED_DIR);
 	for (auto &f : files)
-	{
-		auto parent = f.parent_path();
-		auto mesh_class = parent.string().substr(parent.parent_path().string().size() + 1);
-		ccs[mesh_class]++;
-	}
+		ccs[f.parent_path().filename().string()]++;
 	for (auto it = ccs.begin(); it != ccs.end(); ++it)
 		classes.push_back(it->first);
 
@@ -590,9 +568,7 @@ int main(int argc, char *argv[])
 							double precision = 0;
 							for (size_t i = 0; i < numMeshes; i++)
 							{
-								auto parent = fdb.meshes[i].parent_path();
-								auto curr_class = parent.string().substr(
-									parent.parent_path().string().size() + 1);
+								auto curr_class = fdb.meshes[i].parent_path().filename().string();
 								int FP = 0, TP = 0;
 								vector<int> nn_idx(k);
 								vector<double> dd(k);
@@ -600,9 +576,7 @@ int main(int argc, char *argv[])
 													   nn_idx.data(), dd.data());
 								for (int id : nn_idx)
 								{
-									auto p = fdb.meshes[id].parent_path();
-									auto m_class =
-										p.string().substr(p.parent_path().string().size() + 1);
+									auto m_class = fdb.meshes[id].parent_path().filename().string();
 									if (curr_class.compare(m_class))
 										FP++;
 									else
@@ -642,8 +616,7 @@ int main(int argc, char *argv[])
 
 		for (size_t i = 0; i < numMeshes; i++)
 		{
-			auto parent = fdb.meshes[i].parent_path();
-			auto curr_class = parent.string().substr(parent.parent_path().string().size() + 1);
+			auto curr_class = fdb.meshes[i].parent_path().filename().string();
 			int FP = 0, TP = 0, k = 20;
 			if (options.find('a') != options.npos)
 			{
@@ -652,8 +625,7 @@ int main(int argc, char *argv[])
 				menu.f_tree.annkSearch(&feats[i * Features::size()], k, nn_idx.data(), dd.data());
 				for (int id : nn_idx)
 				{
-					auto p = fdb.meshes[id].parent_path();
-					auto m_class = p.string().substr(p.parent_path().string().size() + 1);
+					auto m_class = fdb.meshes[id].parent_path().filename().string();
 					if (curr_class.compare(m_class))
 						FP++;
 					else
@@ -666,8 +638,7 @@ int main(int argc, char *argv[])
 				sort(dists.begin(), dists.end());
 				for (size_t i = 0; i < k; i++)
 				{
-					auto p = dists[i].second.parent_path();
-					auto m_class = p.string().substr(p.parent_path().string().size() + 1);
+					auto m_class = dists[i].second.parent_path().filename().string();
 					if (curr_class.compare(m_class))
 						FP++;
 					else
@@ -747,16 +718,17 @@ int main(int argc, char *argv[])
 		TSNE::run(why_you_edit_pointer.data(), int(numMeshes), Features::size(), out_vec,
 				  int(out_dim), 50, 0.5, 1, false, 1000, 250, 250);
 		ofstream tsne_file(ASSET_PATH "/tsne.txt");
-		vector<double> X(numMeshes);
-		vector<double> Y(numMeshes);
-		vector<double> C(numMeshes);
+		// vector<double> X(numMeshes);
+		// vector<double> Y(numMeshes);
+		// vector<double> C(numMeshes);
 		for (size_t i = 0; i < numMeshes; i++)
 		{
 			tsne_file << out_vec[i * out_dim + 0] << " " << out_vec[i * out_dim + 1] << endl;
-			X[i] = out_vec[i * out_dim + 0];
-			Y[i] = out_vec[i * out_dim + 1];
-			C[i] = (i / 20) / 20.f;
+			// X[i] = out_vec[i * out_dim + 0];
+			// Y[i] = out_vec[i * out_dim + 1];
+			// C[i] = (i / 20) / 20.f;
 		}
+		tsne_file.close();
 		// Failed python plot in c++
 		// try
 		// {
@@ -770,7 +742,6 @@ int main(int argc, char *argv[])
 		// 			  << "\t`python plot.py`" << endl
 		// 			  << "to view the plot of the t-sne." << endl;
 		// }
-		tsne_file.close();
 	}
 	return EXIT_SUCCESS;
 }

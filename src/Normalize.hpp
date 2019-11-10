@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 
+#include "defines.h"
 #include "EigenVectors.hpp"
 #include "Utils.hpp"
 

@@ -65,7 +65,7 @@ std::string GetCmdOptions(int argc, char **argv)
 	return result;
 }
 
-/// Replaces dir before class with another
+/// Replaces dir before class with another, and creates this directory if needed.
 /// So old path may be: x/y/normalized/Airplane/61.off
 /// then the new path will be: x/y/features/Airplane/61.off
 std::filesystem::path replaceDir(std::filesystem::path old, std::string newPath)
