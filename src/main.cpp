@@ -3,7 +3,8 @@
 #endif
 
 // #define L2        // UNCOMMENT FOR L2 Distance metric
-// #define EMD       // UNCOMMENT FOR EMD Distance metric (does not work in ANN, overides L2 in Custom metric case)
+// #define EMD       // UNCOMMENT FOR EMD Distance metric (does not work in ANN, overides L2 in
+// Custom metric case)
 #define ANN_STATS // COMMENT FOR USING CUSTOM METRICS FOR STATS
 #define ORIGINAL_DIR ASSET_PATH "LabeledDB_new"
 #define PREPROCESSED_DIR ASSET_PATH "preprocessed"
@@ -638,7 +639,7 @@ int main(int argc, char *argv[])
 	// Calculate statistics
 	if (options.find('s') != options.npos)
 	{
-		map<string, pair<double, double>> classPerf;
+		map<string, double> classPerf;
 
 		for (size_t i = 0; i < numMeshes; i++)
 		{
@@ -671,37 +672,32 @@ int main(int argc, char *argv[])
 					TP++;
 			}
 #endif
-			size_t P = ccs[curr_class];
-			classPerf[curr_class].first += double(TP) / P;
-			classPerf[curr_class].second += TP / double(TP + FP);
+			classPerf[curr_class] += TP / double(TP + FP);
 		}
 
 		// Average stats over classes and total
-		double recall = 0, precision = 0;
+		double precision = 0;
 		ofstream perf_file(ASSET_PATH "/perf.txt");
+#ifdef ANN_STATS
+		cout << "Calculated precision with ANN" << endl;
+		perf_file << "ANN Statistics" << endl;
+#else
+		cout << "Calculated precision with Custom metrics" << endl;
+		perf_file << "Custom metric Statistics" << endl;
+#endif
+		perf_file << "Class Precision" << endl;
+		cout << "Class Precision" << endl;
 		for (const auto &cs : ccs)
 		{
-			recall += classPerf[cs.first].first;
-			precision += classPerf[cs.first].second;
-			classPerf[cs.first].first /= cs.second;
-			classPerf[cs.first].second /= cs.second;
-			perf_file << cs.first << " " << classPerf[cs.first].first << " "
-					  << classPerf[cs.first].second << endl;
-			cout << cs.first << " " << classPerf[cs.first].first << " "
-				 << classPerf[cs.first].second << endl;
+			precision += classPerf[cs.first];
+			classPerf[cs.first] /= cs.second;
+			perf_file << cs.first << " " << classPerf[cs.first] << endl;
+			cout << cs.first << " " << classPerf[cs.first] << endl;
 		}
-		recall /= fdb.features.size();
 		precision /= fdb.features.size();
-		perf_file << "total " << recall << " " << precision << endl;
+		perf_file << "total " << precision << endl;
 		perf_file.close();
-
-#ifdef ANN_STATS
-		cout << "Calculated statistics with ANN" << endl;
-#else
-		cout << "Calculated statistics with Custom metrics" << endl;
-#endif
-		cout << "Recall over entire database: " << recall << endl
-			 << "Precision over entire database: " << precision << endl;
+		cout << "Precision over entire database: " << precision << endl;
 	}
 
 	// Setup viewer
